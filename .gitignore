@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# bibcheck / litsearch run artefacts (regenerated, never source)
+*_checked.bib
+*_bibcheck_report.md
+*_bibcheck_report.json
+*_bibcheck_cache.json
+*_refs_plaintext.txt
+out/
+runs/
+
+# Secrets: API tokens (NASA ADS, Semantic Scholar) live here, never in git
+.env
+.env.*
+secrets/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code personal settings (shared settings.json IS tracked)
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/logs/
