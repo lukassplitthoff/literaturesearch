@@ -1,62 +1,89 @@
 # literaturesearch
 
-Two packages that together turn a research question into a **validated** bibliography.
+Turns a research question into a **validated** bibliography and an evidence table, where
+every cited work has been checked against an authoritative index and every extracted
+number carries the sentence it came from.
+
+## Start here
+
+```bash
+git clone https://github.com/lukassplitthoff/literaturesearch.git
+cd literaturesearch
+pip install -e .            # runtime dependency: requests, and nothing else
+python -m pytest            # 288 tests, no sockets opened
+```
+
+**Then do the thing that is useful in one command.** If you have a `.bib` file:
+
+```bash
+python -m bibcheck.main path/to/refs.bib --no-write
+```
+
+That reports, without writing anything, what is wrong with your bibliography: missing
+fields, duplicate entries, malformed DOIs, keys that do not follow `LastnameYEAR`. Add
+`--verify` and it also checks every entry against Crossref, DataCite and arXiv, and tells
+you which preprints now have a published version.
+
+```
+  entries      : 24
+  keys renamed : 24
+  errors       : 0
+  warnings     : 21
+```
+
+Exit code `0` clean, `1` warnings, `2` errors. Nothing is modified: `bibcheck` writes a
+cleaned *copy* when you ask it to with `--out-dir`, never in place.
+
+**To run a literature search**, read the worked example first -- it is a real completed
+search with its numbers, and it is shorter than this README:
+
+- [examples/parametric_gates_bosonic_cavities/](examples/parametric_gates_bosonic_cavities/README.md)
+
+Then copy `run_search.py`, edit the `SearchSpec`, and run it. A full search is three
+invocations, because the two model-driven stages hand off through files:
+
+```bash
+python run_search.py     # retrieve, validate, write screening batches
+#   an agent answers <out>/screen/verdicts.jsonl
+python run_search.py     # apply verdicts, write extraction tasks
+#   an agent answers <out>/extract/rows.jsonl
+python run_search.py     # write evidence.csv and the final refs.bib
+```
+
+Inside Claude Code, `/litsearch "<your question>"` drives all three and fills in the
+agent steps for you. Outputs go to `$LITSEARCH_OUT_DIR/<name>/`, default
+`~/litsearch-runs/<name>/` -- outside the repository, because run results are data.
+
+**Windows note:** `pip install -e ".[dev]"` can fail with `No such file or directory` on a
+long path, because `pre-commit` ships deeply nested fixture files. Either [enable
+long-path support](https://pip.pypa.io/warnings/enable-long-paths) or clone somewhere
+short. The runtime install is unaffected.
+
+## What is in here
 
 | Package | Status | What it does |
 | --- | --- | --- |
-| [`bibcheck/`](bibcheck/README.md) | working, 154 tests | Takes a `.bib` file and writes a cleaned, publication-ready copy: keys unified to `LastnameYEAR`, entries sorted, completeness checked, and every entry verified against Crossref, DataCite, arXiv and OpenAlex. |
-| `litsearch/` | spine working, 43 tests | AI-assisted literature search harness. Question in, validated corpus out. Retrieval, dedup, snowballing, the validation gate and the bibliography exporter are built and tested; screening and evidence extraction run through the Claude subagents in `.claude/agents/`. See [Design](#litsearch-design). |
+| [`bibcheck/`](bibcheck/README.md) | working, 157 tests | Takes a `.bib` file and writes a cleaned, publication-ready copy: keys unified to `LastnameYEAR`, entries sorted, completeness checked, every entry verified against Crossref, DataCite, arXiv and OpenAlex. Useful on its own. |
+| [`litsearch/`](litsearch/) | working, 131 tests | The search harness. Retrieval, dedup, snowballing, the validation gate and the exporters are deterministic Python; screening and evidence extraction run through the subagents in `.claude/agents/`. |
+| [`benchmark/`](benchmark/benchmark.py) | | A regression benchmark over a frozen corpus for the deterministic layers. No network, no model, about a second. |
 
 The design principle that connects them: **nothing reaches the output that has not been
-resolved against an authoritative index.** `bibcheck` is not a companion tool to the search,
-it is the gate the search results must pass through.
+resolved against an authoritative index.** `bibcheck` is not a companion to the search, it
+is the gate the search results pass through.
 
-## Install
-
-```bash
-pip install -e .          # runtime: requests only
-pip install -e ".[dev]"   # adds pytest and pre-commit
-```
-
-Verified from a clean clone into a fresh virtualenv on Windows (Python 3.12):
-runtime install, 252 tests, and a live search all pass.
-
-**Windows note:** installing the `[dev]` extra can fail with
-`No such file or directory` on a long path, because `pre-commit` ships deeply
-nested fixture files. Either [enable long-path
-support](https://pip.pypa.io/warnings/enable-long-paths) or clone somewhere
-short (`C:\src\literaturesearch`). The runtime install is unaffected.
-
-## bibcheck quick start
+## Benchmark
 
 ```bash
-python -m bibcheck.main path/to/refs.bib --no-write                        # report only
-python -m bibcheck.main path/to/refs.bib --out-dir ./out                   # write cleaned copy
-python -m bibcheck.main path/to/refs.bib --verify --mailto you@example.com # cross-check indexes
+python benchmark/benchmark.py            # compare against the baseline
+python benchmark/benchmark.py --update   # accept an intended change
 ```
 
-Exit code: `0` clean, `1` warnings, `2` errors. Full documentation in
-[`bibcheck/README.md`](bibcheck/README.md).
-
-```bash
-python -m pytest          # 197 tests, no sockets opened
-```
-
-## litsearch quick start
-
-```bash
-python run_search.py      # edit the CONFIG block at the top first
-```
-
-Writes `corpus.jsonl`, `refs.bib`, `shortlist.md`, `quarantine.md` and `run.json` into
-`runs/<name>/`. Only works that passed the validation gate reach `refs.bib`.
-
-`run_search.py` is a template. The worked example -- a real, completed search with its
-numbers -- is [examples/parametric_gates_bosonic_cavities/](examples/parametric_gates_bosonic_cavities/README.md).
-
-Conversationally, `/litsearch "<your question>"` loads the skill in `.claude/skills/`,
-which drives the same pipeline and adds the screening and extraction stages through the
-`lit-scout`, `lit-screener` and `lit-extractor` subagents.
+It measures dedup, the triage rules, the topical guard and the exporter against a frozen
+corpus, and reports the trade that matters: how many tokens the triage rules save, and how
+many screener-approved papers they destroy in the process. It deliberately does **not**
+measure retrieval recall or screening accuracy -- the labels came from the pipeline's own
+screening, so scoring against them would be circular. That needs a gold set chosen by a
+domain expert before any run, which does not exist yet.
 
 ## litsearch design
 

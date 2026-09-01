@@ -43,3 +43,7 @@ jobs:
 
       - name: Console script
         run: bibcheck --help
+
+      - name: Benchmark
+        # Fails if the deterministic layers drift from benchmark/baseline.json.
+        run: python benchmark/benchmark.py
