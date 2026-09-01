@@ -86,6 +86,8 @@ class SearchConfig:
     seeds_per_round: int = DEFAULT_SEEDS_PER_ROUND
     refs_per_seed: int = DEFAULT_REFS_PER_SEED
     saturation_threshold: float = DEFAULT_SATURATION_THRESHOLD
+    # Distinct query terms a snowballed work must show to be admitted. 0 disables the guard.
+    min_term_hits: int = 2
     known_items: list[str] = field(default_factory=list)
     mailto: str = ""
     out_dir: Path = field(default_factory=lambda: run_dir("latest"))

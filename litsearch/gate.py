@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from bibcheck.verify import IndexClient, is_repository_doi
+from litsearch import batch
 from litsearch.corpus import TITLE_MATCH_RATIO, title_similarity
 from litsearch.sources.base import Work
 
@@ -136,6 +137,16 @@ def validate_all(
     minutes. The cache is flushed every ``save_every`` works: without that, an interrupted
     run throws away everything it fetched and the next run starts from nothing.
     """
+    # Resolve every DOI in batches first. This is purely a speed measure: it seeds the
+    # cache under the same keys the per-work lookups use, so the loop below is unchanged
+    # and simply finds most of its answers already present. A DOI the batch misses is
+    # still asked about individually.
+    with_doi = [work.doi for work in works if work.doi]
+    if with_doi:
+        print(f"    prefetching {len(with_doi)} DOIs from Crossref in batches of {batch.BATCH_SIZE}")
+        resolved = batch.prefetch_crossref(client, with_doi)
+        print(f"    prefetch resolved {resolved} records")
+
     verdicts = []
     passed = []
     total = len(works)

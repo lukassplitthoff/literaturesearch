@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from litsearch import relevance
 from litsearch.config import SearchConfig
 from litsearch.corpus import Corpus
 from litsearch.sources import openalex, semanticscholar
@@ -25,6 +26,7 @@ class RoundStats:
     found: int
     new: int
     corpus_size: int
+    off_topic: int = 0
 
     @property
     def new_fraction(self) -> float:
@@ -37,6 +39,7 @@ class RoundStats:
             "found": self.found,
             "new": self.new,
             "corpus_size": self.corpus_size,
+            "off_topic_dropped": self.off_topic,
             "new_fraction": round(self.new_fraction, 4),
         }
 
@@ -49,6 +52,8 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
     """
     stats: list[RoundStats] = []
     expanded: set = set()
+    terms = relevance.terms_from_queries(cfg.queries)
+    print(f"  topical terms: {' '.join(sorted(terms))}")
     for round_index in range(1, cfg.max_rounds + 1):
         seeds = corpus.seed_candidates(cfg.seeds_per_round, seen=expanded)
         if not seeds:
@@ -69,12 +74,19 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
                 harvested.extend(semanticscholar.references(fetcher, pid))
 
         harvested = [w for w in harvested if cfg.in_year_range(w.year)]
+
+        # The topical guard. Without it, a seed's citers and references drag in every
+        # field its authors happened to cite, and the corpus stops being about the
+        # question. See litsearch/relevance.py.
+        harvested, off_topic = relevance.filter_on_topic(harvested, terms, cfg.min_term_hits)
+
         new_count = corpus.add_all(harvested, round_index=round_index)
-        stat = RoundStats(round_index, len(seeds), len(harvested), new_count, len(corpus))
+        stat = RoundStats(round_index, len(seeds), len(harvested), new_count, len(corpus), off_topic)
         stats.append(stat)
         print(
-            f"  round {round_index}: {len(seeds)} seeds -> {len(harvested)} found, "
-            f"{new_count} new, corpus {len(corpus)} (new fraction {stat.new_fraction:.3f})"
+            f"  round {round_index}: {len(seeds)} seeds -> {len(harvested)} on topic "
+            f"({off_topic} dropped as off topic), {new_count} new, corpus {len(corpus)} "
+            f"(new fraction {stat.new_fraction:.3f})"
         )
         if stat.new_fraction < cfg.saturation_threshold:
             print(f"  saturated: new fraction below {cfg.saturation_threshold}")
