@@ -42,7 +42,12 @@ def to_work(item: dict) -> Work:
     biblio = item.get("biblio") or {}
     first_page = biblio.get("first_page") or ""
     last_page = biblio.get("last_page") or ""
-    pages = f"{first_page}--{last_page}" if first_page and last_page else first_page
+    # A single-page article has first == last, and "045014--045014" is not a page range --
+    # Crossref deposits it as "045014", and bibcheck rightly reports the difference.
+    if first_page and last_page and first_page != last_page:
+        pages = f"{first_page}--{last_page}"
+    else:
+        pages = first_page or last_page
     return Work(
         title=item.get("display_name") or "",
         doi=doi,

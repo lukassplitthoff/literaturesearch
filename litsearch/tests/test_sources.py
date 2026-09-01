@@ -127,3 +127,21 @@ def test_ads_reports_available_once_a_token_is_set(monkeypatch):
     assert ads.available() is True
     # Still unimplemented, but must degrade rather than raise.
     assert ads.search(None, "any query") == []
+
+
+def test_a_single_page_article_is_not_rendered_as_a_range():
+    """OpenAlex gives first_page == last_page for an article number. '045014--045014' is
+    not a page range, and Crossref deposits it as '045014' -- bibcheck flagged the
+    difference on a real bibliography."""
+    item = dict(OPENALEX_ITEM, biblio={"volume": "4", "first_page": "045014", "last_page": "045014"})
+    assert openalex.to_work(item).pages == "045014"
+
+
+def test_a_real_page_range_is_preserved():
+    item = dict(OPENALEX_ITEM, biblio={"volume": "12", "first_page": "1779", "last_page": "1786"})
+    assert openalex.to_work(item).pages == "1779--1786"
+
+
+def test_a_missing_last_page_falls_back_to_the_first():
+    item = dict(OPENALEX_ITEM, biblio={"first_page": "42", "last_page": None})
+    assert openalex.to_work(item).pages == "42"
