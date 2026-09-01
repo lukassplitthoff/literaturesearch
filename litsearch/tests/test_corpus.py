@@ -214,3 +214,13 @@ def test_near_identical_titles_with_different_dois_still_stay_separate():
     corpus.add(make(title="Coherence in transmons Part I", doi="10.1/p1", year="2023", authors=["A. Smith"]))
     corpus.add(make(title="Coherence in transmons Part II", doi="10.1/p2", year="2023", authors=["A. Smith"]))
     assert len(corpus) == 2
+
+
+def test_author_name_order_does_not_defeat_the_duplicate_merge():
+    """Indexes give the same person as both 'Yao Lu' and 'Lu, Yao'. Taking the last token
+    yields 'Lu' for one and 'Yao' for the other, which let a known duplicate through."""
+    corpus = Corpus()
+    t = "High-fidelity parametric beamsplitting with a parity-protected converter"
+    corpus.add(make(title=t, doi="10.1038/s41467-023-41104-0", year="2023", authors=["Yao Lu"]))
+    corpus.add(make(title=t, doi="10.1038/s41467-023-41822-5", year="2023", authors=["Lu, Yao"]))
+    assert len(corpus) == 1

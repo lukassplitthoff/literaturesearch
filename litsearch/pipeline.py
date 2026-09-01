@@ -138,6 +138,8 @@ def run(spec: SearchSpec) -> int:
     counts = screen.apply_verdicts(corpus, screen.load_verdicts(screen_dir / "verdicts.jsonl"))
     batch_bytes = sum(path.stat().st_size for path in batches)
     print(f"  {len(batches)} batches, {batch_bytes / 1024:.0f} KB (~{batch_bytes // 4000} k tokens)")
+    if counts["realigned"]:
+        print(f"  {counts['realigned']} verdict(s) relocated by checksum after the corpus shifted")
     if counts["unverified"]:
         print(f"  [WARN] {counts['unverified']} verdict(s) carry no checksum and could not be "
               f"verified; re-screen them if the corpus has changed since they were written")

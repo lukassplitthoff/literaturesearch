@@ -187,7 +187,35 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
     scratch.
     """
     counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0,
-              "misaligned": 0, "unverified": 0}
+              "misaligned": 0, "unverified": 0, "realigned": 0}
+
+    # The index is a hint; the checksum is the identity. Corpus positions shift whenever
+    # dedup or triage changes -- merging one duplicate renumbers every work after it -- and
+    # re-screening a whole corpus because one record moved would be absurd. So a verdict
+    # whose checksum does not match its index is looked up by checksum instead, and applied
+    # only when exactly one work answers to it. Ambiguous or absent: refused.
+    by_checksum: dict[str, list[int]] = {}
+    for position, work in enumerate(corpus.works):
+        by_checksum.setdefault(checksum(work.title), []).append(position)
+
+    relocated: dict[int, dict] = {}
+    stale: set[int] = set()
+    for index, row in verdicts.items():
+        echo = row.get("t", "")
+        at_index = corpus.works[index].title if 0 <= index < len(corpus.works) else ""
+        if not echo or _title_echo_matches(echo, at_index):
+            continue
+        candidates = by_checksum.get(" ".join(echo.lower().split()), [])
+        if len(candidates) == 1:
+            relocated[candidates[0]] = row
+            # Drop the stale entry, or it stays behind pointing at the wrong work and is
+            # counted a second time as a misalignment.
+            stale.add(index)
+            counts["realigned"] += 1
+    verdicts = {
+        index: row for index, row in verdicts.items() if index not in stale or index in relocated
+    }
+    verdicts.update(relocated)
     for index, work in enumerate(corpus.works):
         row = verdicts.get(index)
         if row is not None and not row.get("t"):

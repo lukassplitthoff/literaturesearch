@@ -76,7 +76,7 @@ def test_unscreened_works_are_counted_and_never_included():
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "yes"}})
     assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0,
-                      "misaligned": 0, "unverified": 1}, "a verdict with no checksum is counted"
+                      "misaligned": 0, "unverified": 1, "realigned": 0}, "a verdict with no checksum is counted"
     assert [w.title for w in screen.included(corpus)] == ["Paper number 0"]
     assert len(screen.needs_review(corpus)) == 2, "unscreened work must surface for review"
 
@@ -228,16 +228,31 @@ def test_a_work_outside_the_corpus_is_refused(tmp_path):
 # ------------------------------------------------------- the verdict-alignment checksum
 
 
-def test_a_verdict_naming_the_wrong_paper_is_refused():
+def test_a_verdict_never_lands_on_the_paper_its_stale_index_points_at():
     """The bug that motivated this: misaligned verdicts produced a clean-looking,
-    fully validated bibliography of papers nobody had actually screened."""
+    fully validated bibliography of papers nobody had actually screened.
+
+    The checksum names paper 2, so the verdict moves there. What must never happen is
+    paper 0 -- the one the stale index points at -- being included.
+    """
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(
         corpus,
         {0: {"verdict": "include", "reason": "x", "t": "Paper number 2"}},
     )
+    assert [w.title for w in screen.included(corpus)] == ["Paper number 2"]
+    assert counts["realigned"] == 1
+
+
+def test_a_verdict_for_a_paper_not_in_the_corpus_is_refused():
+    """No index match and no checksum match: there is nothing to apply it to."""
+    corpus = corpus_of(3)
+    counts = screen.apply_verdicts(
+        corpus,
+        {0: {"verdict": "include", "reason": "x", "t": "A paper from another search"}},
+    )
     assert counts["misaligned"] == 1
-    assert screen.included(corpus) == [], "a misaligned verdict must not be applied"
+    assert screen.included(corpus) == [], "a verdict naming an absent paper must not apply"
 
 
 def test_a_matching_echo_is_accepted():
@@ -375,3 +390,41 @@ def test_a_checksummed_verdict_is_not_counted_as_unverified():
         corpus, {0: {"verdict": "include", "reason": "x", "t": "paper number 0"}}
     )
     assert counts["unverified"] == 0
+
+
+def test_a_verdict_is_relocated_by_checksum_when_the_corpus_shifts():
+    """Merging one duplicate renumbers every work after it. Re-screening a whole corpus
+    because one record moved would be absurd, so the checksum is the identity and the
+    index only a hint."""
+    corpus = Corpus()
+    corpus.add(Work(title="Alpha paper about qubits", doi="10.1/a"))
+    corpus.add(Work(title="Beta paper about cavities", doi="10.1/b"))
+    # A verdict written when "Beta" sat at index 0, before "Alpha" was inserted ahead of it.
+    counts = screen.apply_verdicts(
+        corpus, {0: {"verdict": "include", "reason": "x", "t": "beta paper about cavities"}}
+    )
+    assert counts["realigned"] == 1
+    assert [w.title for w in screen.included(corpus)] == ["Beta paper about cavities"]
+
+
+def test_an_ambiguous_checksum_is_refused_not_guessed():
+    corpus = Corpus()
+    corpus.add(Work(title="Coherence in transmon qubits alpha", doi="10.1/a"))
+    corpus.add(Work(title="Coherence in transmon qubits beta", doi="10.1/b"))
+    # Both share the first four words, so the checksum cannot single one out.
+    counts = screen.apply_verdicts(
+        corpus, {5: {"verdict": "include", "reason": "x", "t": "coherence in transmon qubits"}}
+    )
+    assert counts["realigned"] == 0
+    assert screen.included(corpus) == []
+
+
+def test_a_relocated_verdict_is_not_also_counted_as_misaligned():
+    """The stale entry must be dropped, not left pointing at the wrong work."""
+    corpus = corpus_of(3)
+    counts = screen.apply_verdicts(
+        corpus, {0: {"verdict": "include", "reason": "x", "t": "Paper number 2"}}
+    )
+    assert counts["realigned"] == 1
+    assert counts["misaligned"] == 0, "one verdict must not be counted twice"
+    assert counts["unscreened"] == 2, "papers 0 and 1 are simply unscreened"

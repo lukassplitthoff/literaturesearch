@@ -11,6 +11,7 @@ import json
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from bibcheck.keys import first_author_surname
 from bibcheck.verify import is_arxiv_doi
 from litsearch.sources.base import Work
 
@@ -35,8 +36,11 @@ def _same_work_despite_doi(left: Work, right: Work) -> bool:
         return False
     if left.year and right.year and left.year != right.year:
         return False
-    first = [w.authors[0].split()[-1].lower() for w in (left, right) if w.authors and w.authors[0].split()]
-    return len(first) == 2 and first[0] == first[1]
+    # bibcheck's parser rather than a naive split: indexes give the same person as both
+    # "Yao Lu" and "Lu, Yao", and taking the last token yields "Lu" for one and "Yao" for
+    # the other. That mismatch let a known duplicate through twice.
+    surnames = [first_author_surname(work.authors[0]).lower() for work in (left, right) if work.authors]
+    return len(surnames) == 2 and surnames[0] and surnames[0] == surnames[1]
 
 
 def title_similarity(left: str, right: str) -> float:

@@ -65,8 +65,13 @@ SPEC = SearchSpec(
     ),
     exclusion_criteria=(
         "Gates between two-level qubits only, with no bosonic mode; non-superconducting "
-        "platforms (trapped ion, optical photonics, spin, NV centre); papers about "
-        "amplifiers, readout or sensing with no gate; reviews with no new gate."
+        "platforms (trapped ion, optical photonics, spin, NV centre); readout, sensing or "
+        "metrology papers with no gate; reviews with no new gate. "
+        "On amplifiers specifically: a Josephson parametric AMPLIFIER used to amplify a "
+        "signal is out of scope, but a parametric interaction that squeezes or entangles "
+        "the modes of a resonator is in scope even when the device is called an amplifier "
+        "-- the interaction is the subject here, not the packaging. Higher levels of a "
+        "transmon are not a bosonic mode; the mode must be a cavity or resonator."
     ),
     # Scope: SUPERCONDUCTING MICROWAVE bosonic cavities only.
     #

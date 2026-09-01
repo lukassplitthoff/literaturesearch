@@ -51,6 +51,9 @@ python run_search.py      # edit the CONFIG block at the top first
 Writes `corpus.jsonl`, `refs.bib`, `shortlist.md`, `quarantine.md` and `run.json` into
 `runs/<name>/`. Only works that passed the validation gate reach `refs.bib`.
 
+`run_search.py` is a template. The worked example -- a real, completed search with its
+numbers -- is [examples/parametric_gates_bosonic_cavities/](examples/parametric_gates_bosonic_cavities/README.md).
+
 Conversationally, `/litsearch "<your question>"` loads the skill in `.claude/skills/`,
 which drives the same pipeline and adds the screening and extraction stages through the
 `lit-scout`, `lit-screener` and `lit-extractor` subagents.
