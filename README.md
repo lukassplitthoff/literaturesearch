@@ -150,7 +150,3 @@ CROSSREF_MAILTO=you@example.com
 only `deny` and `ask` rules; add web permissions to your own gitignored
 `.claude/settings.local.json`.
 
-## Provenance
-
-`bibcheck` was developed inside a private measurement-framework repository and moved here on
-2026-09-01, from commit `38b54122e`. It had no dependencies on that repository.
