@@ -18,6 +18,15 @@ pip install -e .          # runtime: requests only
 pip install -e ".[dev]"   # adds pytest and pre-commit
 ```
 
+Verified from a clean clone into a fresh virtualenv on Windows (Python 3.12):
+runtime install, 252 tests, and a live search all pass.
+
+**Windows note:** installing the `[dev]` extra can fail with
+`No such file or directory` on a long path, because `pre-commit` ships deeply
+nested fixture files. Either [enable long-path
+support](https://pip.pypa.io/warnings/enable-long-paths) or clone somewhere
+short (`C:\src\literaturesearch`). The runtime install is unaffected.
+
 ## bibcheck quick start
 
 ```bash

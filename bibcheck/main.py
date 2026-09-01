@@ -45,7 +45,10 @@ SUFFIX_CACHE = "_bibcheck_cache.json"
 
 def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="python -m bibcheck.main",
+        # The installed console script's name. Left to argparse this becomes "main.py"
+        # under `python -m`, and hardcoding the module form made the console script
+        # advertise an invocation the user had not used. "bibcheck" is right for both.
+        prog="bibcheck",
         description="Unify keys, sort, check completeness and verify a BibTeX file.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
