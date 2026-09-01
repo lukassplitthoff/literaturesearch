@@ -59,6 +59,8 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
         if not seeds:
             print("  no unexpanded seeds left; stopping")
             break
+        basis = "screener-approved" if corpus.screened_in() else "query hits (unscreened)"
+        print(f"  seeding from {basis}")
         expanded.update(id(seed) for seed in seeds)
         harvested = []
         for seed in seeds:

@@ -153,3 +153,72 @@ def test_duplicate_dois_are_requested_once(client, monkeypatch):
     batch.prefetch_crossref(c, ["10.1/a"] * 40, batch_size=50, verbose=False)
     assert len(seen) == 1
     assert seen[0]["filter"].count("doi:") == 1
+
+
+# ----------------------------------------------------------------------- triage funnel
+
+FORBIDDEN = ("nitrogen-vacancy", "molecular spin", "vanadyl", "trapped ion")
+REQUIRED = ("superconduct", "transmon", "fluxonium", "josephson")
+
+
+def test_a_forbidden_platform_is_excluded_without_a_model_call():
+    work = Work(title="Room-temperature coherence in vanadyl phthalocyanine spin qubits",
+                abstract="We report magnetic relaxation and quantum coherence.")
+    verdict, reason = relevance.triage(work, REQUIRED, FORBIDDEN)
+    assert verdict == relevance.RULE_EXCLUDE
+    assert "vanadyl" in reason
+
+
+def test_a_paper_missing_every_subject_term_is_excluded():
+    work = Work(title="Noise-adaptive compiler mappings for quantum computers",
+                abstract="A compiler pass for qubit mapping.")
+    verdict, _ = relevance.triage(work, REQUIRED, FORBIDDEN)
+    assert verdict == relevance.RULE_EXCLUDE
+
+
+def test_an_on_topic_paper_still_goes_to_the_model():
+    """Rules may prove a paper is off subject; they must never assert it qualifies."""
+    work = Work(title="Enhanced coherence of all-nitride superconducting qubits",
+                abstract="Improving the coherence of superconducting qubits.")
+    verdict, _ = relevance.triage(work, REQUIRED, FORBIDDEN)
+    assert verdict == relevance.NEEDS_AI, "only a read abstract can confirm a measurement"
+
+
+def test_forbidden_beats_required():
+    """A superconducting resonator hosting spin qubits is still the wrong platform."""
+    work = Work(title="Vanadyl spin qubit arrays on superconducting resonators",
+                abstract="2D vanadyl porphyrin layers with superior spin coherence.")
+    verdict, reason = relevance.triage(work, REQUIRED, FORBIDDEN)
+    assert verdict == relevance.RULE_EXCLUDE and "vanadyl" in reason
+
+
+def test_triage_all_stamps_reasons_and_splits():
+    works = [
+        Work(title="Transmon coherence measurement", abstract="superconducting qubit T1"),
+        Work(title="NV magnetometry", abstract="nitrogen-vacancy centre in diamond"),
+    ]
+    to_model, excluded = relevance.triage_all(works, REQUIRED, FORBIDDEN)
+    assert len(to_model) == 1 and len(excluded) == 1
+    assert excluded[0].screen == "exclude"
+    assert excluded[0].screen_reason.startswith("rule:")
+
+
+def test_no_rules_means_everything_reaches_the_model():
+    works = [Work(title="Anything"), Work(title="Anything else")]
+    to_model, excluded = relevance.triage_all(works)
+    assert len(to_model) == 2 and excluded == []
+
+
+def test_rule_verdicts_survive_applying_model_verdicts():
+    """Triage runs before the batches; its verdicts must not be wiped on the way back."""
+    from litsearch.corpus import Corpus
+    from litsearch import screen
+
+    corpus = Corpus()
+    corpus.add_all([Work(title="Transmon paper", doi="10.1/a", abstract="superconducting"),
+                    Work(title="NV paper", doi="10.1/b", abstract="nitrogen-vacancy centre")])
+    relevance.triage_all(corpus.works, REQUIRED, FORBIDDEN)
+    counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "on topic"}})
+    assert counts["include"] == 1
+    assert counts["exclude"] == 1 and counts["by_rule"] == 1
+    assert counts["unscreened"] == 0, "a rule-settled work is not unscreened"

@@ -82,3 +82,60 @@ def filter_on_topic(works: list, terms: set[str], min_hits: int = DEFAULT_MIN_TE
     """Split harvested works into (kept, number dropped)."""
     kept = [work for work in works if is_on_topic(work, terms, min_hits)]
     return kept, len(works) - len(kept)
+
+
+# --------------------------------------------------------------------------- triage
+#
+# Screening a corpus costs one model call per abstract, and on a real run 60% of those
+# calls returned "exclude" for a reason a string match could have found: the paper is
+# about a different physical platform. Molecular spin qubits, NV centres, trapped ions
+# and photonic encodings all use the words "qubit", "coherence" and "relaxation", so the
+# topical guard admits them, and the model then spends a call each to say so.
+#
+# Triage puts a rule in front of the model. Rules decide the clear-cut cases for free and
+# the model adjudicates only the genuine middle. The rules are supplied per search, not
+# baked in -- the mechanism is general, the vocabulary is not.
+
+RULE_EXCLUDE = "exclude_rule"
+NEEDS_AI = "needs_ai"
+
+
+
+def triage(work, required_any: tuple = (), forbidden_any: tuple = ()) -> tuple[str, str]:
+    """Decide whether a rule can settle this work, or the model has to read it.
+
+    Returns (verdict, reason) where verdict is RULE_EXCLUDE or NEEDS_AI. There is no
+    RULE_INCLUDE on purpose: a rule may cheaply prove a paper is about the wrong subject,
+    but it cannot prove a paper reports the measurement -- that needs the abstract read
+    properly, and guessing "include" from keywords is how unrelated papers end up cited.
+
+    ``forbidden_any``: any of these phrases present -> excluded. Use for other platforms
+    and publication types that can never satisfy the criteria.
+    ``required_any``: none of these present -> excluded. Use for the subject's own
+    vocabulary, the terms a qualifying paper cannot avoid using.
+    """
+    haystack = f"{getattr(work, 'title', '')} {getattr(work, 'abstract', '')}".lower()
+
+    for phrase in forbidden_any:
+        if phrase.lower() in haystack:
+            return RULE_EXCLUDE, f"rule: mentions '{phrase}'"
+
+    if required_any:
+        if not any(phrase.lower() in haystack for phrase in required_any):
+            return RULE_EXCLUDE, "rule: none of the required subject terms present"
+
+    return NEEDS_AI, ""
+
+
+def triage_all(works: list, required_any: tuple = (), forbidden_any: tuple = ()) -> tuple[list, list]:
+    """Split works into (needing a model call, rule-excluded with reasons attached)."""
+    to_model, excluded = [], []
+    for work in works:
+        verdict, reason = triage(work, required_any, forbidden_any)
+        if verdict == RULE_EXCLUDE:
+            work.screen = "exclude"
+            work.screen_reason = reason
+            excluded.append(work)
+        else:
+            to_model.append(work)
+    return to_model, excluded

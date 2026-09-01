@@ -28,6 +28,12 @@ VALID_VERDICTS = (INCLUDE, EXCLUDE, UNSURE)
 
 DEFAULT_BATCH_SIZE = 25
 
+# Abstracts are truncated before they are sent. A screening decision -- is this the right
+# platform, is there a measurement -- is almost always settled by the first few sentences,
+# and the tail of an abstract is method detail that costs tokens without changing the
+# verdict. 600 characters keeps the opening claim and the usual "we measure X" sentence.
+ABSTRACT_CHARS = 600
+
 INSTRUCTIONS = (
     "For each work below, decide whether it meets the inclusion criteria. "
     "Reply with one JSON object per line and nothing else: "
@@ -37,15 +43,19 @@ INSTRUCTIONS = (
 )
 
 
-def work_summary(work: Work, index: int) -> dict:
-    """The reduced view a screener sees: title and abstract, never the full record."""
-    return {
-        "index": index,
-        "title": work.title,
-        "year": work.year,
-        "venue": work.venue,
-        "abstract": (work.abstract or "")[:1500],
-    }
+def work_summary(work: Work, index: int, abstract_chars: int = ABSTRACT_CHARS) -> dict:
+    """The reduced view a screener sees: title and abstract, never the full record.
+
+    Short keys and a truncated abstract, because this structure is repeated once per work
+    and the field names are paid for every time.
+    """
+    summary = {"i": index, "t": work.title}
+    if work.year:
+        summary["y"] = work.year
+    abstract = (work.abstract or "").strip()
+    if abstract:
+        summary["a"] = abstract[:abstract_chars]
+    return summary
 
 
 def prepare_batches(
@@ -54,25 +64,34 @@ def prepare_batches(
     exclusion: str,
     out_dir: Path,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    abstract_chars: int = ABSTRACT_CHARS,
+    works: list[Work] | None = None,
 ) -> list[Path]:
-    """Write screening batches. Returns the paths written."""
+    """Write screening batches. Returns the paths written.
+
+    ``works`` overrides which works are batched -- pass the survivors of triage so the
+    model is not asked about papers a rule already settled. Indices stay global, matching
+    positions in the corpus, so verdicts apply correctly on the way back.
+    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     for stale in out_dir.glob("batch_*.json"):
         stale.unlink()
 
     paths = []
-    works = corpus.works
+    works = corpus.works if works is None else works
     for start in range(0, len(works), batch_size):
         chunk = works[start : start + batch_size]
         payload = {
             "instructions": INSTRUCTIONS,
             "inclusion_criteria": inclusion,
             "exclusion_criteria": exclusion,
-            "works": [work_summary(work, start + offset) for offset, work in enumerate(chunk)],
+            "works": [work_summary(work, start + offset, abstract_chars) for offset, work in enumerate(chunk)],
         }
         path = out_dir / f"batch_{start // batch_size:02d}.json"
-        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        # Compact separators, no indentation: this file exists to be read by a model, and
+        # pretty-printing costs a sizeable slice of the payload in whitespace alone.
+        path.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
         paths.append(path)
     return paths
 
@@ -98,12 +117,24 @@ def load_verdicts(path: Path) -> dict[int, dict]:
     return verdicts
 
 
-def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict]) -> dict[str, int]:
-    """Stamp verdicts onto the corpus. Returns counts per verdict, including unscreened."""
-    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0}
+def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts: bool = True) -> dict[str, int]:
+    """Stamp model verdicts onto the corpus. Returns counts per verdict.
+
+    A work already settled by triage keeps that verdict: it was never sent to the model,
+    so the absence of a model answer for it is expected, not a gap. Clearing it here would
+    silently undo the triage pass and push hundreds of rule-excluded papers back into the
+    review queue. ``keep_rule_verdicts=False`` forces a clean slate when re-screening from
+    scratch.
+    """
+    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0}
     for index, work in enumerate(corpus.works):
         row = verdicts.get(index)
         if row is None:
+            rule_set = keep_rule_verdicts and work.screen and work.screen_reason.startswith("rule:")
+            if rule_set:
+                counts[work.screen] += 1
+                counts["by_rule"] += 1
+                continue
             work.screen = ""
             work.screen_reason = ""
             counts["unscreened"] += 1

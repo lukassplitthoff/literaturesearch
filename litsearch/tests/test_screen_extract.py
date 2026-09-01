@@ -26,7 +26,7 @@ def test_batches_split_and_cover_every_work(tmp_path):
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["inclusion_criteria"] == "include all"
-        seen.extend(w["index"] for w in payload["works"])
+        seen.extend(w["i"] for w in payload["works"])
     assert seen == list(range(7)), "indices must be global and cover the corpus exactly"
 
 
@@ -34,8 +34,7 @@ def test_batches_expose_only_title_and_abstract(tmp_path):
     corpus = corpus_of(1)
     corpus.works[0].oa_pdf_url = "https://example.org/secret.pdf"
     payload = json.loads(screen.prepare_batches(corpus, "a", "b", tmp_path)[0].read_text(encoding="utf-8"))
-    assert "oa_pdf_url" not in payload["works"][0]
-    assert "doi" not in payload["works"][0]
+    assert set(payload["works"][0]) <= {"i", "t", "y", "a"}, "only index, title, year, abstract"
 
 
 def test_stale_batches_are_cleared(tmp_path):
@@ -76,7 +75,7 @@ def test_missing_verdicts_file_is_not_an_error(tmp_path):
 def test_unscreened_works_are_counted_and_never_included():
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "yes"}})
-    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2}
+    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0}
     assert [w.title for w in screen.included(corpus)] == ["Paper number 0"]
     assert len(screen.needs_review(corpus)) == 2, "unscreened work must surface for review"
 

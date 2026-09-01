@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from bibcheck.verify import IndexClient
-from litsearch import export, extract, report, retrieve, screen, snowball
+from litsearch import export, extract, relevance, report, retrieve, screen, snowball
 from litsearch.config import OUT_DIR_ENV, SearchConfig, run_dir, warn_if_inside_repo
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
@@ -63,6 +63,26 @@ INCLUSION_CRITERIA = (
 EXCLUSION_CRITERIA = (
     "Review articles without new measurements; theory-only papers with no measured device; "
     "non-superconducting platforms (trapped ion, spin, photonic, NV centre)."
+)
+
+# Triage rules, applied BEFORE any model call. Rules are cheap and settle the clear-cut
+# cases; the model only sees what a rule cannot decide. Derived from a real screening
+# pass in which 60% of model calls returned "exclude" for a platform mismatch a string
+# match would have caught.
+#
+# A paper mentioning any FORBIDDEN phrase is excluded outright.
+SCREEN_FORBIDDEN = (
+    "nitrogen-vacancy", "nitrogen vacancy", "nv centre", "nv center",
+    "trapped ion", "trapped-ion", "molecular spin", "single-ion magnet",
+    "single-molecule magnet", "vanadyl", "phthalocyanine", "porphyrin",
+    "metal-organic framework", "lanthanide", "actinide", "nuclear spin qubit",
+    "quantum dot spin", "silicon spin qubit", "donor spin",
+)
+# A paper mentioning NONE of these is excluded: the subject's own vocabulary, which a
+# qualifying paper cannot avoid using.
+SCREEN_REQUIRED = (
+    "superconduct", "transmon", "fluxonium", "josephson", "cooper pair",
+    "circuit qed", "cqed", "microwave cavity", "coaxial cavity", "3d cavity",
 )
 
 # Stage 6 columns. Every one of these must be quotable from the paper or it is recorded null.
@@ -139,9 +159,16 @@ def main() -> int:
     # verdicts back, so the stage is resumable: run once to emit the batches, have the
     # lit-screener subagent answer them, then run again to consume the answers.
     screen_dir = cfg.out_dir / "screen"
-    batches = screen.prepare_batches(corpus, INCLUSION_CRITERIA, EXCLUSION_CRITERIA, screen_dir)
+    # Rules first, model second. Anything a rule can settle never reaches a batch.
+    to_model, rule_excluded = relevance.triage_all(corpus.works, SCREEN_REQUIRED, SCREEN_FORBIDDEN)
+    print(f"  triage: {len(rule_excluded)} excluded by rule, {len(to_model)} need the model "
+          f"({100 * len(to_model) / max(len(corpus), 1):.0f}% of the corpus)")
+    batches = screen.prepare_batches(corpus, INCLUSION_CRITERIA, EXCLUSION_CRITERIA, screen_dir, works=to_model)
     screen_counts = screen.apply_verdicts(corpus, screen.load_verdicts(screen_dir / "verdicts.jsonl"))
-    if screen_counts["unscreened"] == len(corpus):
+    batch_bytes = sum(p.stat().st_size for p in batches)
+    print(f"  {len(batches)} batches, {batch_bytes / 1024:.0f} KB total "
+          f"(~{batch_bytes // 4000} k tokens to screen)")
+    if screen_counts["unscreened"] + screen_counts["by_rule"] == len(corpus):
         print(f"  {len(batches)} batches written to {screen_dir}")
         print(f"  no verdicts yet -- answer them into {screen_dir / 'verdicts.jsonl'}, then re-run")
     else:
@@ -153,7 +180,7 @@ def main() -> int:
     # Only works that BOTH passed the gate and were screened in are worth reading.
     included = [work for work in screen.included(corpus) if work.validation == "verified"]
     if not included:
-        included = passed if screen_counts["unscreened"] == len(corpus) else []
+        included = passed if screen_counts["unscreened"] + screen_counts["by_rule"] == len(corpus) else []
         if included:
             print("  no screening verdicts yet; preparing tasks for every validated work")
     extract_dir = cfg.out_dir / "extract"
