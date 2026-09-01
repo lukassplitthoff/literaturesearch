@@ -97,4 +97,16 @@ def _why_empty(name: str) -> str:
         return "a key is set, so this is more likely a transient outage or a changed API."
     if name == ads.NAME:
         return f"NASA ADS is not implemented yet and needs {ads.TOKEN_ENV}; see litsearch/sources/ads.py."
+    if name == openalex.NAME:
+        if not openalex.api_key():
+            return (
+                "OpenAlex has metered its API since Feb 2026. Without a key the daily budget "
+                "is about $0.10 and a search costs about $0.001, so roughly a hundred searches "
+                f"before HTTP 429. Set {openalex.KEY_ENV} (free key, about a minute, at "
+                "openalex.org/settings/api) for ten times that. The budget resets at midnight UTC."
+            )
+        return (
+            "a key is set, so this is a spent daily budget, an outage, or a query the index "
+            "genuinely has nothing for. The budget resets at midnight UTC."
+        )
     return "check the query syntax for this source, or whether the service is reachable."

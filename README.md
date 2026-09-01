@@ -106,12 +106,28 @@ any stage can be re-run or inspected alone.
 
 ### Sources
 
-Free and keyless unless noted. Google Scholar is deliberately **not** a programmatic source:
-it has no API, blocks scrapers, and scraping it violates its terms.
+Google Scholar is deliberately **not** a programmatic source: it has no API, blocks
+scrapers, and scraping it violates its terms.
+
+**OpenAlex has metered its API since February 2026.** Without a key the daily budget is
+about $0.10 and a search call costs about $0.001 -- roughly a hundred searches before
+requests return HTTP 429. A free key takes about a minute
+([openalex.org/settings/api](https://openalex.org/settings/api)) and raises it tenfold.
+Set it and it is sent automatically:
+
+```bash
+export OPENALEX_API_KEY=...      # strongly recommended; OpenAlex is the primary source
+export S2_API_KEY=...            # optional, Semantic Scholar throttles keyless clients
+export ADS_API_TOKEN=...         # optional, NASA ADS (not implemented yet)
+```
+
+A run that exhausts the budget does not crash: the source reports that it returned nothing
+and says why, and the search continues on whatever else is enabled. But OpenAlex supplies
+the large majority of results, so a keyless large run will be badly thinned.
 
 | Source | Role |
 | --- | --- |
-| OpenAlex | Search + citation graph + open-access PDF locations |
+| OpenAlex | Search + citation graph + open-access PDF locations. **Metered; use a free key** |
 | Semantic Scholar | Search + citation graph + TLDR summaries (optional key raises rate limit) |
 | arXiv | Preprint search and full text |
 | Crossref / DataCite | Publisher-deposited record; the validation backbone |

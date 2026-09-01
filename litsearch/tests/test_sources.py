@@ -145,3 +145,15 @@ def test_a_real_page_range_is_preserved():
 def test_a_missing_last_page_falls_back_to_the_first():
     item = dict(OPENALEX_ITEM, biblio={"first_page": "42", "last_page": None})
     assert openalex.to_work(item).pages == "42"
+
+
+def test_openalex_sends_the_api_key_when_one_is_set(monkeypatch):
+    """OpenAlex has metered its API since Feb 2026; without a key the daily budget runs
+    out after roughly a hundred searches."""
+    monkeypatch.setenv(openalex.KEY_ENV, "secret-key")
+    assert openalex.with_key({"search": "x"}) == {"search": "x", "api_key": "secret-key"}
+
+
+def test_openalex_omits_the_key_when_absent(monkeypatch):
+    monkeypatch.delenv(openalex.KEY_ENV, raising=False)
+    assert openalex.with_key({"search": "x"}) == {"search": "x"}

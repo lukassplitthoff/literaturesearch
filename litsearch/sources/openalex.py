@@ -1,9 +1,17 @@
 """OpenAlex: keyword search, the citation graph, and open-access PDF locations.
 
-Free, no key. A ``mailto`` puts requests in the polite pool.
+Since February 2026 OpenAlex meters the API against a daily budget. Without a key that
+budget is small -- a search call costs about $0.001 and the keyless allowance is roughly
+$0.10/day, so about a hundred searches before requests start returning HTTP 429. A free
+key (openalex.org/settings/api, about a minute to obtain) raises it tenfold.
+
+Set OPENALEX_API_KEY and it is sent automatically. Without it the searches here still work
+for a small run and then stop, which is worth knowing before a large one.
 """
 
 from __future__ import annotations
+
+import os
 
 from litsearch.sources.base import Fetcher, Work, clean_arxiv_id, clean_doi
 
@@ -11,6 +19,19 @@ SEARCH_URL = "https://api.openalex.org/works"
 WORK_URL = "https://api.openalex.org/works/{oid}"
 
 NAME = "openalex"
+KEY_ENV = "OPENALEX_API_KEY"
+
+
+def api_key() -> str:
+    return os.environ.get(KEY_ENV, "").strip()
+
+
+def with_key(params: dict) -> dict:
+    """Add the API key when one is configured. Harmless when it is not."""
+    key = api_key()
+    return {**params, "api_key": key} if key else params
+
+
 FIELDS = (
     "id,doi,display_name,publication_year,authorships,primary_location,"
     "abstract_inverted_index,cited_by_count,best_oa_location,referenced_works,biblio"
@@ -75,21 +96,21 @@ def search(fetcher: Fetcher, query: str, limit: int = 50, year_from=None, year_t
     params = {"search": query, "per-page": min(limit, 200), "select": FIELDS}
     if year_from or year_to:
         params["filter"] = f"publication_year:{year_from or 1800}-{year_to or 2100}"
-    payload = fetcher.get(f"openalex:search:{query}:{year_from}:{year_to}:{limit}", SEARCH_URL, params)
+    payload = fetcher.get(f"openalex:search:{query}:{year_from}:{year_to}:{limit}", SEARCH_URL, with_key(params))
     if not payload:
         return []
     return [to_work(item) for item in payload.get("results") or []]
 
 
 def by_id(fetcher: Fetcher, oid: str) -> Work | None:
-    payload = fetcher.get(f"openalex:work:{oid}", WORK_URL.format(oid=oid), {"select": FIELDS})
+    payload = fetcher.get(f"openalex:work:{oid}", WORK_URL.format(oid=oid), with_key({"select": FIELDS}))
     return to_work(payload) if payload else None
 
 
 def cited_by(fetcher: Fetcher, oid: str, limit: int = 50) -> list[Work]:
     """Forward citations: the works that cite this one."""
     params = {"filter": f"cites:{oid}", "per-page": min(limit, 200), "select": FIELDS}
-    payload = fetcher.get(f"openalex:cites:{oid}:{limit}", SEARCH_URL, params)
+    payload = fetcher.get(f"openalex:cites:{oid}:{limit}", SEARCH_URL, with_key(params))
     if not payload:
         return []
     return [to_work(item) for item in payload.get("results") or []]
