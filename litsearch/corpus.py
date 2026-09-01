@@ -99,6 +99,27 @@ class Corpus:
         pool = [w for w in self.works if w.found_in_round not in exclude_rounds]
         return sorted(pool, key=lambda w: w.cited_by_count, reverse=True)[:count]
 
+    def seed_candidates(self, count: int, from_rounds: tuple[int, ...] = (0,), seen: set | None = None) -> list[Work]:
+        """Pick snowball seeds, most cited first, from the given discovery rounds.
+
+        Seeds come from round 0 -- the direct query hits -- by default, and NOT from the
+        whole corpus. Ranking the whole corpus by citation count seeds on the most-cited
+        paper present, which after one round is a famous review from an adjacent field
+        rather than anything on topic. Expanding that drags in its entire neighbourhood,
+        and the next round does it again: the corpus grows without becoming more relevant,
+        and `new_fraction` can never fall because the neighbourhood is effectively endless.
+
+        Anchoring seeds to the query hits keeps expansion pointed at the question. `seen`
+        carries the ids already expanded, so no seed is paid for twice.
+        """
+        seen = seen or set()
+        pool = [
+            work
+            for work in self.works
+            if work.found_in_round in from_rounds and id(work) not in seen
+        ]
+        return sorted(pool, key=lambda w: w.cited_by_count, reverse=True)[:count]
+
     def write_jsonl(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as handle:

@@ -154,3 +154,29 @@ def test_two_different_papers_both_arxiv_only_stay_separate():
     corpus.add(make(title="Paper about tantalum films", doi="10.48550/arxiv.2301.00001", arxiv_id="2301.00001"))
     corpus.add(make(title="Paper about niobium films", doi="10.48550/arxiv.2301.00002", arxiv_id="2301.00002"))
     assert len(corpus) == 2
+
+
+def test_seeds_come_from_the_query_hits_not_the_whole_corpus():
+    """Seeding on overall citation count drags the search into adjacent fields.
+
+    A famous review pulled in by snowballing outranks every on-topic paper, and expanding
+    it drags in its whole neighbourhood -- which is how a 186-work corpus became 1004
+    works mostly about nanocrystals and domain walls.
+    """
+    corpus = Corpus()
+    corpus.add_all([make(title="On topic query hit", doi="10.1/hit", cited_by_count=10)], round_index=0)
+    corpus.add_all([make(title="Famous unrelated review", doi="10.1/rev", cited_by_count=90000)], round_index=1)
+    seeds = corpus.seed_candidates(5)
+    assert [w.title for w in seeds] == ["On topic query hit"]
+
+
+def test_a_seed_is_never_expanded_twice():
+    corpus = Corpus()
+    corpus.add_all([make(title="Paper A", doi="10.1/a", cited_by_count=50),
+                    make(title="Paper B", doi="10.1/b", cited_by_count=10)], round_index=0)
+    first = corpus.seed_candidates(1)
+    seen = {id(w) for w in first}
+    second = corpus.seed_candidates(1, seen=seen)
+    assert [w.title for w in first] == ["Paper A"]
+    assert [w.title for w in second] == ["Paper B"]
+    assert corpus.seed_candidates(5, seen=seen | {id(w) for w in second}) == []

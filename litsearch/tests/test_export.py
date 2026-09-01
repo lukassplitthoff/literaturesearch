@@ -66,7 +66,7 @@ def test_colliding_authors_and_years_get_distinct_keys():
 
 def test_write_bibtex_reports_findings(tmp_path):
     path = tmp_path / "refs.bib"
-    count, findings = write_bibtex(path, [PAPER, PREPRINT])
+    count, findings, _ = write_bibtex(path, [PAPER, PREPRINT])
     assert count == 2
     assert path.exists()
     assert isinstance(findings, list)
@@ -76,7 +76,7 @@ def test_write_bibtex_reports_findings(tmp_path):
 
 
 def test_empty_corpus_produces_an_empty_bibliography(tmp_path):
-    count, _ = write_bibtex(tmp_path / "refs.bib", [])
+    count, _, _ = write_bibtex(tmp_path / "refs.bib", [])
     assert count == 0
 
 
@@ -136,3 +136,35 @@ def test_preprints_get_no_volume_or_pages():
     entry = loads(build_bibtex([work])).entries[0]
     assert entry.get("volume") is None
     assert entry.get("pages") is None
+
+
+def test_cyrillic_first_author_falls_through_to_a_latin_one():
+    """A key cannot be built from a non-Latin name; a later Latin author is far better.
+
+    Known limitation: bibcheck's own key assignment reads author[0] and cannot parse a
+    Cyrillic name either, so it declines to re-key and our provisional key survives with
+    its uniqueness suffix. The key is still Latin-rooted and traceable, and the author
+    field is left exactly as the index supplied it -- transliterating a person's name to
+    tidy up a citation key is not a trade this pipeline makes.
+    """
+    work = Work(title="Magnetic nanoparticles", doi="10.1/cyr", year="2005",
+                authors=["\u0421. \u041f. \u0413\u0443\u0431\u0438\u043d", "Yurii A. Koksharov"])
+    entry = loads(build_bibtex([work])).entries[0]
+    assert entry.key.startswith("Koksharov2005"), f"expected the Latin author, got {entry.key}"
+
+
+def test_all_non_latin_authors_still_produce_an_ascii_key():
+    work = Work(title="A paper", doi="10.1/cyr2", year="2005",
+                authors=["\u0421. \u041f. \u0413\u0443\u0431\u0438\u043d"])
+    entry = loads(build_bibtex([work])).entries[0]
+    assert entry.key and entry.key.isascii(), f"key must be ASCII, got {entry.key}"
+    assert entry.key.startswith("Anon2005")
+
+
+def test_authorless_work_is_dropped_and_reported(tmp_path):
+    """Edited volumes arrive with no authorships; a citation key cannot be invented."""
+    orphan = Work(title="Quantum Noise in Mesoscopic Physics", doi="10.1/book", year="2003")
+    count, findings, uncitable = write_bibtex(tmp_path / "refs.bib", [PAPER, orphan])
+    assert count == 1, "the authorless work must not reach the bibliography"
+    assert [w.title for w in uncitable] == ["Quantum Noise in Mesoscopic Physics"]
+    assert [f for f in findings if f.level == "error"] == [], "and it must not leave an error behind"

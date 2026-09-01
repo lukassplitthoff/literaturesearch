@@ -42,12 +42,19 @@ class RoundStats:
 
 
 def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundStats]:
-    """Run snowball rounds until saturation or the round cap. Returns per-round stats."""
+    """Run snowball rounds until saturation or the round cap. Returns per-round stats.
+
+    Seeds are drawn from the direct query hits (round 0) and each is expanded at most
+    once. See ``Corpus.seed_candidates`` for why seeding on the whole corpus is wrong.
+    """
     stats: list[RoundStats] = []
+    expanded: set = set()
     for round_index in range(1, cfg.max_rounds + 1):
-        seeds = corpus.top_by_citations(cfg.seeds_per_round)
+        seeds = corpus.seed_candidates(cfg.seeds_per_round, seen=expanded)
         if not seeds:
+            print("  no unexpanded seeds left; stopping")
             break
+        expanded.update(id(seed) for seed in seeds)
         harvested = []
         for seed in seeds:
             oid = seed.source_ids.get(openalex.NAME)

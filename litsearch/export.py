@@ -47,13 +47,38 @@ def _clean(value: str) -> str:
     return " ".join(str(value or "").translate(_CHAR_TABLE).split())
 
 
+def _ascii_surname(name: str) -> str:
+    """The trailing word of a name, reduced to ASCII letters. '' if nothing survives."""
+    cleaned = _clean(name)
+    if not cleaned:
+        return ""
+    return "".join(ch for ch in cleaned.split()[-1] if ch.isascii() and ch.isalpha())
+
+
 def _provisional_key(work: Work, index: int) -> str:
-    """A unique placeholder key; bibcheck reassigns these to LastnameYEAR."""
+    """A unique placeholder key; bibcheck reassigns these to LastnameYEAR.
+
+    Falls through the author list rather than insisting on the first author. Names in a
+    non-Latin script -- Cyrillic, CJK -- yield no ASCII surname, and a key cannot be built
+    from them; when a later author has a Latin name, that is far better than failing.
+    Collaborations sometimes list a non-Latin name first purely by alphabetisation.
+    """
     surname = ""
-    if work.authors:
-        surname = _clean(work.authors[0]).split()[-1] if _clean(work.authors[0]) else ""
-    surname = "".join(ch for ch in surname if ch.isalpha()) or "Anon"
-    return f"{surname}{work.year or '0000'}x{index}"
+    for author in work.authors:
+        surname = _ascii_surname(author)
+        if surname:
+            break
+    return f"{surname or 'Anon'}{work.year or '0000'}x{index}"
+
+
+def citable(work: Work) -> bool:
+    """Can this work produce a valid bibliography entry at all?
+
+    A work with no author has no citation key and fails bibcheck's required-field rule.
+    That is a gap in the index record (edited volumes and conference proceedings are the
+    usual culprits), not something to paper over with a fabricated author.
+    """
+    return bool(work.authors) and bool(work.title)
 
 
 def work_to_entry_text(work: Work, index: int) -> str:
@@ -108,10 +133,17 @@ def build_bibtex(works: list[Work], ascii_only: bool = True) -> str:
     return dumps(database, sort="global")
 
 
-def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tuple[int, list]:
-    """Write refs.bib. Returns (entry count, bibcheck findings on the result)."""
+def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tuple[int, list, list[Work]]:
+    """Write refs.bib.
+
+    Returns (entry count, bibcheck findings, works that could not be cited). The third
+    value is not an afterthought: a work dropped here has vanished from the deliverable,
+    so the caller has to report it rather than let the count quietly shrink.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    uncitable = [work for work in works if not citable(work)]
+    works = [work for work in works if citable(work)]
     text = build_bibtex(works, ascii_only=ascii_only)
     path.write_text(text, encoding="utf-8")
 
@@ -122,7 +154,7 @@ def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tupl
     findings = list(file_findings)
     for report in reports:
         findings.extend(report.findings)
-    return len(database.entries), findings
+    return len(database.entries), findings, uncitable
 
 
 EVIDENCE_COLUMNS = (

@@ -176,7 +176,7 @@ def main() -> int:
 
     # Only validated works go into the bibliography. Quarantined ones never appear.
     bib_works = included or passed
-    entry_count, findings = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
+    entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
     errors = [f for f in findings if f.level == "error"]
     kept = export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted)
 
@@ -184,6 +184,10 @@ def main() -> int:
     print(f"  {len(passed)} validated, {held} quarantined")
     print(f"  refs.bib: {entry_count} entries, {len(errors)} errors, {len(findings) - len(errors)} other findings")
     print(f"  evidence.csv: {kept} rows with a source quote")
+    if uncitable:
+        print(f"  {len(uncitable)} work(s) could not be cited (no author on the index record):")
+        for work in uncitable[:5]:
+            print(f"    [dropped] {work.title[:64]}")
     for finding in errors[:5]:
         print(f"    [error] {finding.key}: {finding.message}")
 
