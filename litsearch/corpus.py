@@ -11,9 +11,17 @@ import json
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from bibcheck.verify import is_arxiv_doi
 from litsearch.sources.base import Work
 
 TITLE_MATCH_RATIO = 0.92
+
+
+def _publisher_doi(work: Work) -> str | None:
+    """The work's DOI, unless it is arXiv's own -- which identifies a preprint, not a venue."""
+    if not work.doi or is_arxiv_doi(work.doi):
+        return None
+    return work.doi
 
 
 def title_similarity(left: str, right: str) -> float:
@@ -46,7 +54,11 @@ class Corpus:
             # different papers, however alike their titles look. Without this, near-identical
             # titles -- "... Part I" and "... Part II", a paper and its erratum, two devices
             # from one group -- collapse into a single record and one of them is lost.
-            if work.doi and existing.doi and work.doi != existing.doi:
+            #
+            # An arXiv DOI (10.48550/arXiv.*) is exempt, because it is not a publisher DOI:
+            # it is arXiv's own registration of the preprint, so the preprint and the
+            # published article legitimately carry different DOIs while being one paper.
+            if _publisher_doi(work) and _publisher_doi(existing) and work.doi != existing.doi:
                 continue
             if work.arxiv_id and existing.arxiv_id and work.arxiv_id != existing.arxiv_id:
                 continue

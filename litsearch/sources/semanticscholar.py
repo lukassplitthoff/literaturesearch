@@ -6,6 +6,8 @@ the run degrades to OpenAlex, which covers the same graph.
 
 from __future__ import annotations
 
+import os
+
 from litsearch.sources.base import Fetcher, Work, clean_arxiv_id, clean_doi
 
 SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -13,6 +15,12 @@ PAPER_URL = "https://api.semanticscholar.org/graph/v1/paper/{pid}"
 CITATIONS_URL = "https://api.semanticscholar.org/graph/v1/paper/{pid}/citations"
 
 NAME = "semanticscholar"
+KEY_ENV = "S2_API_KEY"
+
+
+def has_key() -> bool:
+    """Without a key S2 rate-limits keyless clients to near zero -- see available()."""
+    return bool(os.environ.get(KEY_ENV))
 FIELDS = "paperId,title,year,abstract,authors,externalIds,venue,citationCount,openAccessPdf"
 
 

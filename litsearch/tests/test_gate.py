@@ -117,3 +117,45 @@ def test_nothing_unverified_ever_reaches_the_passed_list(offline_client):
     passed, verdicts = validate_all(works, client)
     assert passed == []
     assert all(v.status == QUARANTINED for v in verdicts)
+
+
+# ------------------------------------------------------- enrichment from the index record
+
+
+def test_enrichment_fills_empty_fields_from_the_verifying_record(offline_client):
+    """The gate already paid for the Crossref request; use what it returned."""
+    doi = "10.1038/s41467-021-22030-5"
+    payload = crossref_payload(REAL_TITLE, doi)
+    payload["message"]["volume"] = "12"
+    payload["message"]["page"] = "1779-1786"
+    client = offline_client({crossref_key(doi): payload})
+    work = Work(title=REAL_TITLE, doi=doi)
+    passed, _ = validate_all([work], client, save_every=0, progress_every=0)
+    assert passed == [work]
+    assert work.year == "2021"
+    assert work.venue == "Nature Communications"
+    assert work.volume == "12"
+
+
+def test_enrichment_never_overwrites_what_is_already_known(offline_client):
+    doi = "10.1038/s41467-021-22030-5"
+    client = offline_client({crossref_key(doi): crossref_payload(REAL_TITLE, doi)})
+    work = Work(title=REAL_TITLE, doi=doi, venue="My Preferred Venue Name", year="2020")
+    validate_all([work], client, save_every=0, progress_every=0)
+    assert work.venue == "My Preferred Venue Name"
+    assert work.year == "2020"
+
+
+def test_year_falls_back_to_the_arxiv_id(offline_client):
+    """An entry with no year is a bibliography error; the arXiv id encodes one."""
+    from litsearch.gate import year_from_arxiv_id
+
+    assert year_from_arxiv_id("2301.07848") == "2023"
+    assert year_from_arxiv_id("0704.00001") == "2007"
+    assert year_from_arxiv_id(None) == ""
+    assert year_from_arxiv_id("not-an-id") == ""
+
+    client = offline_client({})
+    work = Work(title="A preprint", arxiv_id="2301.07848")
+    validate_all([work], client, save_every=0, progress_every=0)
+    assert work.year == "2023", "year must be recovered even when the work was quarantined"

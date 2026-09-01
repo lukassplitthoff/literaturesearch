@@ -47,7 +47,7 @@ SOURCES = ("openalex", "semanticscholar", "inspire")  # "ads" is deferred, needs
 PER_QUERY_LIMIT = 50
 # Snowballing is throttled to 1 request per second, so these two numbers set the wall
 # clock: roughly SEEDS_PER_ROUND * (1 + REFS_PER_SEED) seconds per round. Start small.
-MAX_ROUNDS = 1
+MAX_ROUNDS = 3
 SEEDS_PER_ROUND = 8
 REFS_PER_SEED = 4
 

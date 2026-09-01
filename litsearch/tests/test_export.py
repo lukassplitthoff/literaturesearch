@@ -103,11 +103,23 @@ def test_unicode_punctuation_is_folded_to_ascii():
     assert offenders == [], f"non-ASCII punctuation leaked into the .bib: {offenders}"
 
 
-def test_accented_letters_in_names_are_preserved():
-    """Accents are real data, not noise -- bibcheck's --ascii is the place to convert."""
+def test_accents_become_latex_escapes_by_default():
+    """Accents are real data, so they are converted rather than stripped.
+
+    The default is ASCII output: a .bib full of raw UTF-8 trips cp1252 tooling on Windows.
+    The accent survives as a LaTeX escape, which is what BibTeX wants anyway.
+    """
     work = Work(title="A paper", doi="10.1/y", year="2020", authors=["Jos\u00e9 Garc\u00eda"])
-    entry = loads(build_bibtex([work])).entries[0]
-    assert "Jos\u00e9" in (entry.get("author") or "")
+    text = build_bibtex([work])
+    assert sorted({ch for ch in text if ord(ch) > 127}) == [], "output must be pure ASCII"
+    author = loads(text).entries[0].get("author") or ""
+    assert "{\\'e}" in author and "{\\'i}" in author, f"accents must survive as escapes: {author}"
+
+
+def test_ascii_only_can_be_turned_off():
+    work = Work(title="A paper", doi="10.1/y", year="2020", authors=["Jos\u00e9 Garc\u00eda"])
+    author = loads(build_bibtex([work], ascii_only=False)).entries[0].get("author") or ""
+    assert "Jos\u00e9" in author
 
 
 def test_volume_and_pages_reach_the_entry():

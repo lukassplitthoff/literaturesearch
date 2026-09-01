@@ -33,6 +33,7 @@ class Verdict:
     status: str
     index: str = ""
     reason: str = ""
+    record: object = None  # the index Record that resolved it, when one did
 
     def as_dict(self) -> dict:
         return {
@@ -45,6 +46,44 @@ class Verdict:
         }
 
 
+def enrich_from_record(work: Work, record) -> list[str]:
+    """Fill the work's empty fields from the index record that verified it.
+
+    The gate has already paid for this request, and the publisher's deposited record is
+    more authoritative than a search hit. Without this the bibliography is full of
+    "@article has no pages" -- OpenAlex frequently omits pagination that Crossref has.
+
+    Only empty fields are filled; nothing already known is overwritten.
+    """
+    filled = []
+    for work_field, record_field in (
+        ("year", "year"),
+        ("venue", "journal"),
+        ("volume", "volume"),
+        ("pages", "pages"),
+    ):
+        if not getattr(work, work_field, "") and getattr(record, record_field, ""):
+            setattr(work, work_field, str(getattr(record, record_field)))
+            filled.append(work_field)
+    if not work.authors and getattr(record, "authors", None):
+        work.authors = list(record.authors)
+        filled.append("authors")
+    return filled
+
+
+def year_from_arxiv_id(arxiv_id: str | None) -> str:
+    """A modern arXiv id encodes its year: 2301.07848 was submitted in 2023.
+
+    Only used as a last resort, when no index supplied a year at all -- an entry with no
+    year is an error in the bibliography, and this is better than dropping the work.
+    """
+    if not arxiv_id or len(arxiv_id) < 4 or not arxiv_id[:4].isdigit():
+        return ""
+    prefix = int(arxiv_id[:2])
+    # arXiv's YYMM scheme started in 2007; two digits stay unambiguous well past 2030.
+    return str(2000 + prefix) if 7 <= prefix <= 99 else ""
+
+
 def validate(work: Work, client: IndexClient) -> Verdict:
     """Resolve one work against the indexes, cheapest and most authoritative first."""
     if work.doi:
@@ -52,7 +91,7 @@ def validate(work: Work, client: IndexClient) -> Verdict:
         if record is None and is_repository_doi(work.doi):
             record = client.datacite_by_doi(work.doi)
             if record is not None:
-                return Verdict(work, VERIFIED, "datacite")
+                return Verdict(work, VERIFIED, "datacite", record=record)
         if record is not None:
             return _confirm_title(work, record, "crossref")
         return Verdict(work, QUARANTINED, reason=f"DOI {work.doi} not found in Crossref or DataCite")
@@ -76,7 +115,7 @@ def _confirm_title(work: Work, record, index: str) -> Verdict:
 
     ratio = title_similarity(work.norm_title, normalize_title(record.title))
     if ratio >= TITLE_MATCH_RATIO:
-        return Verdict(work, VERIFIED, index)
+        return Verdict(work, VERIFIED, index, record=record)
     return Verdict(
         work,
         QUARANTINED,
@@ -106,7 +145,11 @@ def validate_all(
         work.validation_source = verdict.index
         verdicts.append(verdict)
         if verdict.status == VERIFIED:
+            if verdict.record is not None:
+                enrich_from_record(work, verdict.record)
             passed.append(work)
+        if not work.year:
+            work.year = year_from_arxiv_id(work.arxiv_id)
         if save_every and position % save_every == 0:
             client.save_cache()
         if progress_every and position % progress_every == 0:

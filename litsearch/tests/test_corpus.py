@@ -131,3 +131,26 @@ def test_fuzzy_match_still_applies_when_only_one_side_has_a_doi():
     corpus.add(make(sources=["inspire"]))
     assert len(corpus) == 1
     assert corpus.works[0].doi == "10.1/a"
+
+
+def test_arxiv_doi_and_published_doi_are_one_paper():
+    """The preprint carries 10.48550/arXiv.*, the article carries the publisher's DOI.
+
+    Both are the same work. Treating the arXiv DOI as a conflicting identifier let this
+    pair through as two entries, which bibcheck then flagged as a duplicate.
+    """
+    corpus = Corpus()
+    corpus.add(make(title="Disentangling losses in tantalum superconducting circuits",
+                    doi="10.1103/physrevx.13.041005"))
+    corpus.add(make(title="Disentangling Losses in Tantalum Superconducting Circuits",
+                    doi="10.48550/arxiv.2301.07848", arxiv_id="2301.07848"))
+    assert len(corpus) == 1
+    assert corpus.works[0].doi == "10.1103/physrevx.13.041005", "the publisher DOI must win"
+    assert corpus.works[0].arxiv_id == "2301.07848", "the arXiv id must be carried over"
+
+
+def test_two_different_papers_both_arxiv_only_stay_separate():
+    corpus = Corpus()
+    corpus.add(make(title="Paper about tantalum films", doi="10.48550/arxiv.2301.00001", arxiv_id="2301.00001"))
+    corpus.add(make(title="Paper about niobium films", doi="10.48550/arxiv.2301.00002", arxiv_id="2301.00002"))
+    assert len(corpus) == 2

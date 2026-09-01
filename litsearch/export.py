@@ -89,12 +89,17 @@ def work_to_entry_text(work: Work, index: int) -> str:
     return "\n".join(lines)
 
 
-def build_bibtex(works: list[Work]) -> str:
-    """Render every work, then let bibcheck normalise, re-key and sort the result."""
+def build_bibtex(works: list[Work], ascii_only: bool = True) -> str:
+    """Render every work, then let bibcheck normalise, re-key and sort the result.
+
+    ``ascii_only`` rewrites accented characters as LaTeX escapes ({'e} and friends). It
+    defaults on because a .bib full of raw UTF-8 trips cp1252 tooling on Windows, which is
+    what bibcheck's non-ascii warning is for -- 165 of them on the first real run.
+    """
     blocks = [work_to_entry_text(work, index) for index, work in enumerate(works, start=1)]
     database = loads("\n\n".join(blocks) + "\n")
     for entry in database.entries:
-        normalize_entry(entry)
+        normalize_entry(entry, ascii_only=ascii_only)
     assign_keys(database.entries)
     for entry in database.entries:
         if entry.new_key:
@@ -103,17 +108,17 @@ def build_bibtex(works: list[Work]) -> str:
     return dumps(database, sort="global")
 
 
-def write_bibtex(path: Path, works: list[Work]) -> tuple[int, list]:
+def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tuple[int, list]:
     """Write refs.bib. Returns (entry count, bibcheck findings on the result)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = build_bibtex(works)
+    text = build_bibtex(works, ascii_only=ascii_only)
     path.write_text(text, encoding="utf-8")
 
     # Re-read what we just wrote and check it the way a user would. check_database
     # returns (per-entry reports, file-level findings); both matter here.
     database = loads(text, path=path)
-    reports, file_findings = check_database(database)
+    reports, file_findings = check_database(database, ascii_only=ascii_only)
     findings = list(file_findings)
     for report in reports:
         findings.extend(report.findings)
