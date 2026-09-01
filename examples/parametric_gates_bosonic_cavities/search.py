@@ -66,15 +66,26 @@ EXCLUSION_CRITERIA = (
     "amplifiers or sensing with no gate; reviews with no new gate."
 )
 
-# Rules run before the model. Kept wide on purpose: the bosonic-gate literature is small,
-# and a false exclusion here is more costly than a few extra model calls.
+# Scope: SUPERCONDUCTING MICROWAVE bosonic cavities only.
+#
+# An optical cavity is also a bosonic cavity, and optomechanics is genuinely parametric,
+# so the first run legitimately returned a large optical/optomechanical set -- 42% of the
+# corpus, against 34% superconducting. That is a scope decision rather than drift, and the
+# scope chosen here is the one the seed paper and this group work in.
 SCREEN_FORBIDDEN = (
+    # other platforms that share the entire parametric vocabulary
+    "optomechanic", "opto-mechanic", "magnon", "nanophotonic", "photonic crystal",
+    "silicon photonic", "optical fiber", "optical fibre", "optical parametric oscillator",
+    "telecom wavelength", "cold atom", "atomic ensemble", "bose-einstein",
     "nitrogen-vacancy", "nv centre", "nv center", "trapped ion", "trapped-ion",
     "molecular spin", "single-ion magnet", "vanadyl",
 )
+# Superconducting-circuit vocabulary a qualifying paper is unlikely to avoid. Narrower
+# than the previous list, which accepted a bare "cavity" and so admitted all of optics.
 SCREEN_REQUIRED = (
-    "cavity", "cavities", "resonator", "bosonic", "microwave mode", "oscillator",
-    "beam splitter", "beamsplitter", "squeez", "snail", "parametric",
+    "superconduct", "transmon", "fluxonium", "josephson", "snail",
+    "circuit qed", "cqed", "microwave cavity", "microwave resonator",
+    "coaxial cavity", "3d cavity", "cooper pair", "bosonic mode", "bosonic qubit",
 )
 
 EXTRACTION_SCHEMA = (

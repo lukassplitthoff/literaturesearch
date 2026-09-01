@@ -80,13 +80,26 @@ def prepare_batches(
 
     paths = []
     works = corpus.works if works is None else works
+
+    # The index in a batch must be the work's position in the CORPUS, not its position in
+    # whatever subset was passed. apply_verdicts looks up corpus.works[index], so numbering
+    # a filtered subset from zero silently applies every verdict to the wrong paper -- and
+    # it looks entirely plausible on the way out, which is what makes it dangerous.
+    global_index = {id(work): position for position, work in enumerate(corpus.works)}
+    missing = [work for work in works if id(work) not in global_index]
+    if missing:
+        raise ValueError(
+            f"{len(missing)} works passed to prepare_batches are not in the corpus; "
+            "their verdicts could not be applied back"
+        )
+
     for start in range(0, len(works), batch_size):
         chunk = works[start : start + batch_size]
         payload = {
             "instructions": INSTRUCTIONS,
             "inclusion_criteria": inclusion,
             "exclusion_criteria": exclusion,
-            "works": [work_summary(work, start + offset, abstract_chars) for offset, work in enumerate(chunk)],
+            "works": [work_summary(work, global_index[id(work)], abstract_chars) for work in chunk],
         }
         path = out_dir / f"batch_{start // batch_size:02d}.json"
         # Compact separators, no indentation: this file exists to be read by a model, and

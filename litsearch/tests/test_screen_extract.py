@@ -192,3 +192,33 @@ def test_a_path_inside_the_repository_is_flagged():
     inside = Path(config.__file__).resolve().parent / "some_run_output"
     warning = config.warn_if_inside_repo(inside)
     assert "must never be committed" in warning
+
+
+def test_batch_indices_are_corpus_positions_not_subset_positions(tmp_path):
+    """The bug this guards against silently applied every verdict to the wrong paper.
+
+    prepare_batches is given the survivors of triage, but apply_verdicts looks up
+    corpus.works[index]. Numbering the filtered subset from zero made a verdict about
+    subset item 0 land on corpus item 0 -- a different paper entirely, and the output
+    looked completely plausible.
+    """
+    corpus = corpus_of(6)
+    subset = [corpus.works[2], corpus.works[5]]
+    payload = json.loads(
+        screen.prepare_batches(corpus, "a", "b", tmp_path, works=subset)[0].read_text(encoding="utf-8")
+    )
+    assert [w["i"] for w in payload["works"]] == [2, 5], "indices must be corpus positions"
+
+    screen.apply_verdicts(corpus, {2: {"verdict": "include", "reason": "ok"}})
+    assert [w.title for w in screen.included(corpus)] == ["Paper number 2"]
+
+
+def test_a_work_outside_the_corpus_is_refused(tmp_path):
+    corpus = corpus_of(2)
+    stranger = Work(title="Not in the corpus", doi="10.1/x")
+    try:
+        screen.prepare_batches(corpus, "a", "b", tmp_path, works=[stranger])
+    except ValueError as exc:
+        assert "not in the corpus" in str(exc)
+    else:
+        raise AssertionError("must refuse works whose verdicts could not be applied back")
