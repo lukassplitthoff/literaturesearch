@@ -5,7 +5,7 @@ Two packages that together turn a research question into a **validated** bibliog
 | Package | Status | What it does |
 | --- | --- | --- |
 | [`bibcheck/`](bibcheck/README.md) | working, 154 tests | Takes a `.bib` file and writes a cleaned, publication-ready copy: keys unified to `LastnameYEAR`, entries sorted, completeness checked, and every entry verified against Crossref, DataCite, arXiv and OpenAlex. |
-| `litsearch/` | not built yet | AI-assisted literature search harness. Question in, validated corpus out. See [Design](#litsearch-design). |
+| `litsearch/` | spine working, 43 tests | AI-assisted literature search harness. Question in, validated corpus out. Retrieval, dedup, snowballing, the validation gate and the bibliography exporter are built and tested; screening and evidence extraction run through the Claude subagents in `.claude/agents/`. See [Design](#litsearch-design). |
 
 The design principle that connects them: **nothing reaches the output that has not been
 resolved against an authoritative index.** `bibcheck` is not a companion tool to the search,
@@ -30,8 +30,21 @@ Exit code: `0` clean, `1` warnings, `2` errors. Full documentation in
 [`bibcheck/README.md`](bibcheck/README.md).
 
 ```bash
-python -m pytest          # 154 tests, no sockets opened
+python -m pytest          # 197 tests, no sockets opened
 ```
+
+## litsearch quick start
+
+```bash
+python run_search.py      # edit the CONFIG block at the top first
+```
+
+Writes `corpus.jsonl`, `refs.bib`, `shortlist.md`, `quarantine.md` and `run.json` into
+`runs/<name>/`. Only works that passed the validation gate reach `refs.bib`.
+
+Conversationally, `/litsearch "<your question>"` loads the skill in `.claude/skills/`,
+which drives the same pipeline and adds the screening and extraction stages through the
+`lit-scout`, `lit-screener` and `lit-extractor` subagents.
 
 ## litsearch design
 

@@ -53,7 +53,7 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
             oid = seed.source_ids.get(openalex.NAME)
             if oid:
                 harvested.extend(openalex.cited_by(fetcher, oid, limit=cfg.per_query_limit))
-                for ref_id in seed.references[:20]:
+                for ref_id in seed.references[: cfg.refs_per_seed]:
                     work = openalex.by_id(fetcher, ref_id)
                     if work:
                         harvested.append(work)

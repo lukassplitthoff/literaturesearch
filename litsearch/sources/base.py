@@ -48,6 +48,8 @@ class Work:
     year: str = ""
     authors: list[str] = field(default_factory=list)
     venue: str = ""
+    volume: str = ""
+    pages: str = ""
     abstract: str = ""
     cited_by_count: int = 0
     oa_pdf_url: str = ""
@@ -84,6 +86,8 @@ class Work:
             "year": self.year,
             "authors": self.authors,
             "venue": self.venue,
+            "volume": self.volume,
+            "pages": self.pages,
             "abstract": self.abstract,
             "cited_by_count": self.cited_by_count,
             "oa_pdf_url": self.oa_pdf_url,

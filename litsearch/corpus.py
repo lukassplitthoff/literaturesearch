@@ -97,7 +97,7 @@ class Corpus:
 
 def merge(target: Work, other: Work) -> None:
     """Fold `other` into `target` without overwriting anything already present."""
-    for name in ("doi", "arxiv_id", "year", "venue", "abstract", "oa_pdf_url", "landing_url"):
+    for name in ("doi", "arxiv_id", "year", "venue", "volume", "pages", "abstract", "oa_pdf_url", "landing_url"):
         if not getattr(target, name) and getattr(other, name):
             setattr(target, name, getattr(other, name))
     if not target.authors and other.authors:

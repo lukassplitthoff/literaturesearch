@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from bibcheck.verify import IndexClient
-from litsearch import report, retrieve, snowball
+from litsearch import export, report, retrieve, snowball
 from litsearch.config import SearchConfig
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
@@ -33,8 +33,11 @@ YEAR_FROM = 1995
 YEAR_TO = None
 SOURCES = ("openalex", "semanticscholar", "inspire")  # "ads" is deferred, needs a token
 PER_QUERY_LIMIT = 50
-MAX_ROUNDS = 2
-SEEDS_PER_ROUND = 10
+# Snowballing is throttled to 1 request per second, so these two numbers set the wall
+# clock: roughly SEEDS_PER_ROUND * (1 + REFS_PER_SEED) seconds per round. Start small.
+MAX_ROUNDS = 1
+SEEDS_PER_ROUND = 8
+REFS_PER_SEED = 4
 
 # Papers you already know must be found. Retrieval that misses one of these is broken, and
 # the run says so. Leave empty to skip the check.
@@ -56,6 +59,7 @@ def main() -> int:
         per_query_limit=PER_QUERY_LIMIT,
         max_rounds=MAX_ROUNDS,
         seeds_per_round=SEEDS_PER_ROUND,
+        refs_per_seed=REFS_PER_SEED,
         known_items=KNOWN_ITEMS,
         mailto=MAILTO,
         out_dir=OUT_DIR,
@@ -93,8 +97,15 @@ def main() -> int:
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
     report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known)
+
+    # Only validated works go into the bibliography. Quarantined ones never appear.
+    entry_count, findings = export.write_bibtex(cfg.out_dir / "refs.bib", passed)
+    errors = [f for f in findings if f.level == "error"]
     print(f"  corpus {len(corpus)} works -> {cfg.out_dir}")
     print(f"  {len(passed)} validated, {held} quarantined")
+    print(f"  refs.bib: {entry_count} entries, {len(errors)} errors, {len(findings) - len(errors)} other findings")
+    for finding in errors[:5]:
+        print(f"    [error] {finding.key}: {finding.message}")
 
     missed = [row for row in known if not row["found"]]
     if missed:

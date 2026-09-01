@@ -17,6 +17,9 @@ DEFAULT_SOURCES = ("openalex", "semanticscholar", "inspire")
 DEFAULT_SATURATION_THRESHOLD = 0.05
 DEFAULT_MAX_ROUNDS = 3
 DEFAULT_SEEDS_PER_ROUND = 15
+# Backward references pulled per seed. Each one is a separate throttled request at
+# 1 req/s, so this number is the main driver of how long a snowball round takes.
+DEFAULT_REFS_PER_SEED = 5
 
 
 @dataclass
@@ -31,6 +34,7 @@ class SearchConfig:
     per_query_limit: int = 50
     max_rounds: int = DEFAULT_MAX_ROUNDS
     seeds_per_round: int = DEFAULT_SEEDS_PER_ROUND
+    refs_per_seed: int = DEFAULT_REFS_PER_SEED
     saturation_threshold: float = DEFAULT_SATURATION_THRESHOLD
     known_items: list[str] = field(default_factory=list)
     mailto: str = ""

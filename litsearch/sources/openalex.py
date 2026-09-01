@@ -13,7 +13,7 @@ WORK_URL = "https://api.openalex.org/works/{oid}"
 NAME = "openalex"
 FIELDS = (
     "id,doi,display_name,publication_year,authorships,primary_location,"
-    "abstract_inverted_index,cited_by_count,best_oa_location,referenced_works"
+    "abstract_inverted_index,cited_by_count,best_oa_location,referenced_works,biblio"
 )
 
 
@@ -39,6 +39,10 @@ def to_work(item: dict) -> Work:
     source = location.get("source") or {}
     best_oa = item.get("best_oa_location") or {}
     doi = clean_doi(item.get("doi"))
+    biblio = item.get("biblio") or {}
+    first_page = biblio.get("first_page") or ""
+    last_page = biblio.get("last_page") or ""
+    pages = f"{first_page}--{last_page}" if first_page and last_page else first_page
     return Work(
         title=item.get("display_name") or "",
         doi=doi,
@@ -50,6 +54,8 @@ def to_work(item: dict) -> Work:
             if (a.get("author") or {}).get("display_name")
         ],
         venue=source.get("display_name") or "",
+        volume=str(biblio.get("volume") or ""),
+        pages=pages,
         abstract=_abstract(item.get("abstract_inverted_index")),
         cited_by_count=int(item.get("cited_by_count") or 0),
         oa_pdf_url=best_oa.get("pdf_url") or "",

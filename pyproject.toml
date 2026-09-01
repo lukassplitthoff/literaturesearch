@@ -27,7 +27,7 @@ include = ["bibcheck*", "litsearch*"]
 bibcheck = ["tests/fixtures/*.bib"]
 
 [tool.pytest.ini_options]
-testpaths = ["bibcheck/tests"]
+testpaths = ["bibcheck/tests", "litsearch/tests"]
 addopts = "-q"
 
 [tool.black]
