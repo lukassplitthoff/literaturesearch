@@ -89,6 +89,8 @@ class SearchConfig:
     # Distinct query terms a snowballed work must show to be admitted. 0 disables the guard.
     min_term_hits: int = 2
     known_items: list[str] = field(default_factory=list)
+    # Known papers to seed from, by DOI. An alternative to describing the topic in words.
+    seed_dois: tuple[str, ...] = ()
     mailto: str = ""
     out_dir: Path = field(default_factory=lambda: run_dir("latest"))
     offline: bool = False

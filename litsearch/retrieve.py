@@ -19,6 +19,10 @@ def run(fetcher: Fetcher, cfg: SearchConfig) -> Corpus:
     corpus = Corpus()
     hits_per_source = {name: 0 for name in cfg.sources}
 
+    if cfg.seed_dois:
+        print(f"seed papers ({len(cfg.seed_dois)} DOIs)")
+        corpus.add_all(from_seed_dois(fetcher, cfg.seed_dois), round_index=0)
+
     for query in cfg.queries:
         print(f"query: {query}")
         for name in cfg.sources:
@@ -47,6 +51,38 @@ def run(fetcher: Fetcher, cfg: SearchConfig) -> Corpus:
             print(f"  [WARN] {name} returned nothing across all {len(cfg.queries)} queries")
             print(f"         {_why_empty(name)}")
     return corpus
+
+
+def from_seed_dois(fetcher: Fetcher, dois: tuple[str, ...]) -> list:
+    """Resolve known papers by DOI, to be used as snowball seeds.
+
+    A different way to start a search: instead of describing the topic in words and hoping
+    the vocabulary matches, name a paper that is definitively about it and walk its
+    citation graph. This is usually how a researcher actually works -- "find me things
+    like this one" -- and it sidesteps the vocabulary problem entirely, because the graph
+    does not care what words the papers use.
+
+    Resolved works are marked as round 0, so they seed expansion exactly as query hits do.
+    A DOI that does not resolve is reported and skipped, never silently dropped.
+    """
+    works = []
+    for doi in dois:
+        clean = (doi or "").strip()
+        if not clean:
+            continue
+        payload = fetcher.get(
+            f"openalex:doi:{clean.lower()}",
+            openalex.SEARCH_URL,
+            {"filter": f"doi:{clean}", "select": openalex.FIELDS},
+        )
+        results = (payload or {}).get("results") or []
+        if not results:
+            print(f"  [WARN] seed DOI {clean} did not resolve in OpenAlex; skipped")
+            continue
+        work = openalex.to_work(results[0])
+        works.append(work)
+        print(f"  seed: {work.title[:66]} ({work.cited_by_count} citations, {len(work.references)} refs)")
+    return works
 
 
 def _why_empty(name: str) -> str:

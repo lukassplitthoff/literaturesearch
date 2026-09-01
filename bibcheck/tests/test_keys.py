@@ -14,6 +14,7 @@ from bibcheck.keys import (
     entry_year,
     first_author_surname,
     fold_latex_accents,
+    has_placeholder,
     latexify,
     make_key,
     normalize_title,
@@ -212,3 +213,36 @@ def test_latexify_output_is_ascii_and_folds_back_to_the_original_letters():
 
 def test_latexify_leaves_unknown_characters_alone_rather_than_dropping_them():
     assert "\u4e2d" in latexify("a \u4e2d b")
+
+
+def test_placeholder_markers_match_whole_words_only():
+    """Substring matching flagged real author names and repositories as placeholders.
+
+    'todo' occurs inside 'Christodoulides' (a common nonlinear-optics surname) and inside
+    'Aaltodoc' (Aalto University's repository). Both were reported as unusable fields on a
+    real bibliography.
+    """
+    assert not has_placeholder("Demetrios N. Christodoulides")
+    assert not has_placeholder("Aaltodoc (Aalto University)")
+    assert not has_placeholder("Logan G. Wright and Demetri N. Christodoulides")
+    # Nearby words that merely contain a marker must also survive.
+    assert not has_placeholder("Toxxxin")
+    assert not has_placeholder("Mastodon")
+
+
+def test_real_placeholders_are_still_caught():
+    for text in (
+        "TO VERIFY: check this reference",
+        "TBD",
+        "todo: fill in the volume",
+        "FIXME",
+        "author is a placeholder",
+        "XXX",
+        "???",
+        "Journal name TODO",
+    ):
+        assert has_placeholder(text), f"must still be flagged: {text!r}"
+
+
+def test_placeholder_matching_is_case_insensitive():
+    assert has_placeholder("ToDo") and has_placeholder("TbD")

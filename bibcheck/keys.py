@@ -71,12 +71,32 @@ PLACEHOLDER_MARKERS = (
 )
 
 
+def _placeholder_pattern() -> re.Pattern:
+    """Match the markers as whole words, not as substrings.
+
+    A bare substring test matches inside ordinary bibliographic text: 'todo' occurs in
+    'Chris(todo)ulides', a common nonlinear-optics surname, and in 'Aal(todo)c', Aalto
+    University's repository. Both were reported as unusable placeholder fields on a real
+    run. Word boundaries are applied only to markers made of word characters -- '???' has
+    none, so it stays a plain substring test.
+    """
+    parts = []
+    for marker in PLACEHOLDER_MARKERS:
+        quoted = re.escape(marker)
+        prefix = r"\b" if marker[:1].isalnum() else ""
+        suffix = r"\b" if marker[-1:].isalnum() else ""
+        parts.append(f"{prefix}{quoted}{suffix}")
+    return re.compile("|".join(parts), re.IGNORECASE)
+
+
+_PLACEHOLDER_RE = _placeholder_pattern()
+
+
 def has_placeholder(text: str | None) -> bool:
     """True when the text contains an editing placeholder such as 'TO VERIFY' or 'TBD'."""
     if not text:
         return False
-    lowered = text.lower()
-    return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
+    return _PLACEHOLDER_RE.search(text) is not None
 
 
 _YEAR = re.compile(r"\b((?:1[6-9]|2[0-9])\d{2})\b")
