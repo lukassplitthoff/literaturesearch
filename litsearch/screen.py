@@ -16,6 +16,8 @@ A work with no verdict stays unscreened and is reported, never silently included
 from __future__ import annotations
 
 import json
+import re
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from litsearch.corpus import Corpus
@@ -37,10 +39,16 @@ ABSTRACT_CHARS = 600
 INSTRUCTIONS = (
     "For each work below, decide whether it meets the inclusion criteria. "
     "Reply with one JSON object per line and nothing else: "
-    '{"index": <int>, "verdict": "include|exclude|unsure", "reason": "<one short clause>"}. '
+    '{"index": <int>, "t": "<first 4 words of that work\'s title>", '
+    '"verdict": "include|exclude|unsure", "reason": "<one short clause>"}. '
+    "The 't' field is a checksum: copy it from the work you are judging so a "
+    "misaligned verdict is caught rather than silently applied to another paper. "
     "Use 'unsure' when the abstract does not say enough to decide -- that is a real answer, "
     "not a failure. Judge relevance only; do not judge whether the paper is correct."
 )
+
+# How much of the echoed title must match before a verdict is trusted.
+TITLE_CHECK_RATIO = 0.7
 
 
 def work_summary(work: Work, index: int, abstract_chars: int = ABSTRACT_CHARS) -> dict:
@@ -126,8 +134,35 @@ def load_verdicts(path: Path) -> dict[int, dict]:
         index = row.get("index")
         verdict = str(row.get("verdict", "")).lower()
         if isinstance(index, int) and verdict in VALID_VERDICTS:
-            verdicts[index] = {"verdict": verdict, "reason": str(row.get("reason", ""))}
+            verdicts[index] = {
+                "verdict": verdict,
+                "reason": str(row.get("reason", "")),
+                "t": str(row.get("t", "")),
+            }
     return verdicts
+
+
+def _title_echo_matches(echo: str, title: str) -> bool:
+    """Does the echoed title fragment belong to this work?
+
+    Compared word by word against the title's leading words, because the echo is a short
+    prefix. Word-wise rather than whole-string: two titles differing in one token --
+    '... Part I' and '... Part II', or a numbered series -- score over 0.9 as strings while
+    naming different papers, which is exactly the confusion this check exists to catch.
+    Individual words are compared loosely, so punctuation, case and a typo do not matter.
+    """
+    if not echo:
+        return True  # no checksum supplied: nothing to verify against
+    probe = [w for w in re.split(r"\W+", echo.lower()) if w]
+    if not probe:
+        return True
+    target = [w for w in re.split(r"\W+", (title or "").lower()) if w]
+    if len(probe) > len(target):
+        return False
+    return all(
+        SequenceMatcher(None, word, target[position]).ratio() >= TITLE_CHECK_RATIO
+        for position, word in enumerate(probe)
+    )
 
 
 def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts: bool = True) -> dict[str, int]:
@@ -139,9 +174,15 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
     review queue. ``keep_rule_verdicts=False`` forces a clean slate when re-screening from
     scratch.
     """
-    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0}
+    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0, "misaligned": 0}
     for index, work in enumerate(corpus.works):
         row = verdicts.get(index)
+        if row is not None and not _title_echo_matches(row.get("t", ""), work.title):
+            # The verdict names a different paper than the index points at. Refusing it is
+            # the whole point: a misaligned batch once produced a clean-looking, fully
+            # validated bibliography of papers nobody had screened.
+            counts["misaligned"] += 1
+            row = None
         if row is None:
             rule_set = keep_rule_verdicts and work.screen and work.screen_reason.startswith("rule:")
             if rule_set:

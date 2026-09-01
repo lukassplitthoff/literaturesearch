@@ -75,7 +75,7 @@ def test_missing_verdicts_file_is_not_an_error(tmp_path):
 def test_unscreened_works_are_counted_and_never_included():
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "yes"}})
-    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0}
+    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0, "misaligned": 0}
     assert [w.title for w in screen.included(corpus)] == ["Paper number 0"]
     assert len(screen.needs_review(corpus)) == 2, "unscreened work must surface for review"
 
@@ -222,3 +222,64 @@ def test_a_work_outside_the_corpus_is_refused(tmp_path):
         assert "not in the corpus" in str(exc)
     else:
         raise AssertionError("must refuse works whose verdicts could not be applied back")
+
+
+# ------------------------------------------------------- the verdict-alignment checksum
+
+
+def test_a_verdict_naming_the_wrong_paper_is_refused():
+    """The bug that motivated this: misaligned verdicts produced a clean-looking,
+    fully validated bibliography of papers nobody had actually screened."""
+    corpus = corpus_of(3)
+    counts = screen.apply_verdicts(
+        corpus,
+        {0: {"verdict": "include", "reason": "x", "t": "Paper number 2"}},
+    )
+    assert counts["misaligned"] == 1
+    assert screen.included(corpus) == [], "a misaligned verdict must not be applied"
+
+
+def test_a_matching_echo_is_accepted():
+    corpus = corpus_of(3)
+    counts = screen.apply_verdicts(
+        corpus,
+        {1: {"verdict": "include", "reason": "x", "t": "Paper number 1"}},
+    )
+    assert counts["misaligned"] == 0
+    assert [w.title for w in screen.included(corpus)] == ["Paper number 1"]
+
+
+def test_a_partial_echo_is_accepted():
+    """The echo is a short prefix, not the whole title."""
+    corpus = Corpus()
+    corpus.add(Work(title="High-On-Off-Ratio Beam-Splitter Interaction for Gates", doi="10.1/a"))
+    counts = screen.apply_verdicts(
+        corpus, {0: {"verdict": "include", "reason": "x", "t": "High-On-Off-Ratio Beam-Splitter"}}
+    )
+    assert counts["misaligned"] == 0 and len(screen.included(corpus)) == 1
+
+
+def test_a_verdict_without_an_echo_still_applies():
+    """Backward compatible: an older verdicts file carries no checksum to verify."""
+    corpus = corpus_of(2)
+    counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "x", "t": ""}})
+    assert counts["misaligned"] == 0 and len(screen.included(corpus)) == 1
+
+
+def test_batches_carry_the_title_for_the_checksum(tmp_path):
+    payload = json.loads(
+        screen.prepare_batches(corpus_of(2), "a", "b", tmp_path)[0].read_text(encoding="utf-8")
+    )
+    assert payload["works"][0]["t"] == "Paper number 0"
+    assert "checksum" in payload["instructions"]
+
+
+def test_titles_differing_in_one_token_are_distinguished():
+    """A whole-string ratio scores these above 0.9 while they name different papers."""
+    corpus = Corpus()
+    corpus.add(Work(title="Coherence in transmon qubits Part I", doi="10.1/a"))
+    corpus.add(Work(title="Coherence in transmon qubits Part II", doi="10.1/b"))
+    counts = screen.apply_verdicts(
+        corpus, {0: {"verdict": "include", "reason": "x", "t": "Coherence in transmon qubits Part II"}}
+    )
+    assert counts["misaligned"] == 1

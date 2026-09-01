@@ -24,6 +24,21 @@ def _publisher_doi(work: Work) -> str | None:
     return work.doi
 
 
+def _same_work_despite_doi(left: Work, right: Work) -> bool:
+    """Two records with different publisher DOIs that are nonetheless one paper.
+
+    Requires an EXACT normalised title, the same year and the same first-author surname.
+    All three, because each alone is common: many papers share a year, sequels share an
+    author, and near-identical titles are exactly the case the DOI conflict rule protects.
+    """
+    if left.norm_title != right.norm_title or not left.norm_title:
+        return False
+    if left.year and right.year and left.year != right.year:
+        return False
+    first = [w.authors[0].split()[-1].lower() for w in (left, right) if w.authors and w.authors[0].split()]
+    return len(first) == 2 and first[0] == first[1]
+
+
 def title_similarity(left: str, right: str) -> float:
     if not left or not right:
         return 0.0
@@ -59,7 +74,13 @@ class Corpus:
             # it is arXiv's own registration of the preprint, so the preprint and the
             # published article legitimately carry different DOIs while being one paper.
             if _publisher_doi(work) and _publisher_doi(existing) and work.doi != existing.doi:
-                continue
+                # ...unless they are unmistakably the same paper. Indexes do carry two
+                # publisher DOIs for one article -- a correction record, or a second
+                # deposit -- and a *fuzzy* title match is far too weak to override a DOI
+                # conflict. An exact normalised title plus the same year and the same
+                # first author is not.
+                if not _same_work_despite_doi(work, existing):
+                    continue
             if work.arxiv_id and existing.arxiv_id and work.arxiv_id != existing.arxiv_id:
                 continue
             if title_similarity(norm, existing.norm_title) >= TITLE_MATCH_RATIO:

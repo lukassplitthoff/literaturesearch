@@ -180,3 +180,37 @@ def test_a_seed_is_never_expanded_twice():
     assert [w.title for w in first] == ["Paper A"]
     assert [w.title for w in second] == ["Paper B"]
     assert corpus.seed_candidates(5, seen=seen | {id(w) for w in second}) == []
+
+
+def test_two_publisher_dois_for_one_paper_are_merged():
+    """Indexes really do carry two publisher DOIs for one article (a correction record,
+    or a second deposit). Seen live: Nature Comms 2023 under both s41467-023-41104-0 and
+    s41467-023-41822-5, identical titles, which reached the bibliography twice."""
+    corpus = Corpus()
+    t = "High-fidelity parametric beamsplitting with a parity-protected converter"
+    corpus.add(make(title=t, doi="10.1038/s41467-023-41104-0", year="2023", authors=["B. Chapman"]))
+    corpus.add(make(title=t, doi="10.1038/s41467-023-41822-5", year="2023",
+                    authors=["B. Chapman"], arxiv_id="2303.00959"))
+    assert len(corpus) == 1
+    assert corpus.works[0].arxiv_id == "2303.00959", "the merge must carry the arXiv id over"
+
+
+def test_the_exception_needs_all_three_signals():
+    """An exact title alone must not override a DOI conflict."""
+    t = "A study of qubit coherence"
+    for a, b in (
+        (dict(year="2023", authors=["A. Smith"]), dict(year="2024", authors=["A. Smith"])),
+        (dict(year="2023", authors=["A. Smith"]), dict(year="2023", authors=["B. Jones"])),
+    ):
+        corpus = Corpus()
+        corpus.add(make(title=t, doi="10.1/a", **a))
+        corpus.add(make(title=t, doi="10.1/b", **b))
+        assert len(corpus) == 2, f"must stay separate: {a} vs {b}"
+
+
+def test_near_identical_titles_with_different_dois_still_stay_separate():
+    """The Part I / Part II guard must survive the new exception."""
+    corpus = Corpus()
+    corpus.add(make(title="Coherence in transmons Part I", doi="10.1/p1", year="2023", authors=["A. Smith"]))
+    corpus.add(make(title="Coherence in transmons Part II", doi="10.1/p2", year="2023", authors=["A. Smith"]))
+    assert len(corpus) == 2

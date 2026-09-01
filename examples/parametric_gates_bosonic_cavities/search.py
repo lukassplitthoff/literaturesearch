@@ -52,7 +52,18 @@ MAX_ROUNDS = 2
 SEEDS_PER_ROUND = 10
 REFS_PER_SEED = 12  # the seed has 71 references and they are the point of the exercise
 
-KNOWN_ITEMS: list[str] = []
+# Papers that must appear if retrieval is working. These are NOT supplied from memory:
+# each was found by an earlier run of this search, passed the validation gate against
+# Crossref, and was screened in. That makes this a regression check -- it catches a future
+# change that breaks retrieval -- rather than an independent test of recall, which would
+# need titles chosen by someone who knows the field before the search is run.
+KNOWN_ITEMS: list[str] = [
+    "High-On-Off-Ratio Beam-Splitter Interaction for Gates on Bosonically Encoded Qubits",
+    "Programmable Interference between Two Microwave Quantum Memories",
+    "Observation of Two-Mode Squeezing in the Microwave Frequency Domain",
+    "Efficient cavity control with SNAP gates",
+    "Stabilization and operation of a Kerr-cat qubit",
+]
 
 INCLUSION_CRITERIA = (
     "Reports a parametric gate or parametric interaction between bosonic modes -- a "
@@ -148,6 +159,9 @@ def main() -> int:
 
     print("\n[4/7] known-item check")
     known = report.known_item_results(corpus, cfg.known_items)
+    for row in known:
+        mark = "OK  " if row["found"] else "MISS"
+        print(f"  [{mark}] {row['wanted'][:62]} (similarity {row['similarity']})")
     if not known:
         print("  (none configured)")
 
@@ -182,6 +196,11 @@ def main() -> int:
     print(f"  refs.bib: {entry_count} entries, {len(errors)} errors")
     for finding in errors[:5]:
         print(f"    [error] {finding.key}: {finding.message}")
+
+    missed = [row for row in known if not row["found"]]
+    if missed:
+        print(f"\nWARNING: {len(missed)} known-item(s) not found -- retrieval is incomplete")
+        return 1
     return 0
 
 
