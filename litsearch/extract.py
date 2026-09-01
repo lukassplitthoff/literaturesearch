@@ -94,6 +94,22 @@ def prepare_tasks(
     return paths
 
 
+_NUMERIC_VALUE = re.compile(r"^[<>~=\s]*[-+]?\d+(?:[.,]\d+)?(?:\s*[eE][-+]?\d+)?[\s%]*$")
+
+
+def is_numeric(value) -> bool:
+    """Is this a measured number, rather than descriptive text that happens to contain one?
+
+    The digit check below only makes sense for numbers. A field like
+    ``modes: "two 3D cavities"`` or ``platform: "superconducting, 3D cavity"`` contains a
+    digit incidentally, and demanding the quote repeat it produced a stream of false
+    alarms on the first real extraction.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return True
+    return bool(_NUMERIC_VALUE.match(str(value))) if value not in (None, "", []) else False
+
+
 def _quote_supports(value, quote: str) -> bool:
     """Does the quote plausibly contain the claimed number?
 
@@ -101,7 +117,7 @@ def _quote_supports(value, quote: str) -> bool:
     wants 360 us -- so this only flags a value whose digits appear nowhere in its quote.
     It catches invented numbers, not unit conversions.
     """
-    if value in (None, "", []):
+    if value in (None, "", []) or not is_numeric(value):
         return True
     text = str(value)
     digits = _NUMBER.findall(text)
@@ -120,7 +136,14 @@ def _quote_supports(value, quote: str) -> bool:
 
 
 def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) -> tuple[list[dict], list[str]]:
-    """Enforce the quote guarantee. Returns (accepted rows, complaints)."""
+    """Enforce the quote guarantee. Returns (accepted rows, complaints).
+
+    Two different outcomes, deliberately: a row with NO quote is dropped, because a value
+    nobody can quote is not evidence. A row whose quote does not obviously contain the
+    number it claims is *flagged and kept* -- the check is a heuristic over units and
+    formatting, and silently discarding real measurements over it would be worse than
+    surfacing them for a human to glance at.
+    """
     accepted = []
     complaints = []
     for position, row in enumerate(rows):

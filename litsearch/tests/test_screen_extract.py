@@ -75,7 +75,8 @@ def test_missing_verdicts_file_is_not_an_error(tmp_path):
 def test_unscreened_works_are_counted_and_never_included():
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "yes"}})
-    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0, "misaligned": 0}
+    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0,
+                      "misaligned": 0, "unverified": 1}, "a verdict with no checksum is counted"
     assert [w.title for w in screen.included(corpus)] == ["Paper number 0"]
     assert len(screen.needs_review(corpus)) == 2, "unscreened work must surface for review"
 
@@ -325,3 +326,52 @@ def test_a_work_with_neither_is_marked_unreachable(tmp_path):
     )
     assert payload["has_open_access_pdf"] is False
     assert payload["arxiv_pdf_url"] == ""
+
+
+def test_descriptive_fields_are_not_digit_checked():
+    """'two 3D cavities' contains a digit incidentally; demanding the quote repeat it
+    produced a stream of false alarms on the first real extraction run."""
+    rows = [{"cite_key": "X", "modes": "two 3D cavities", "platform": "superconducting, 3D cavity",
+             "gate_type": "beam splitter",
+             "source_quote": "A SNAIL-based coupler exchanges photons between two cavity modes."}]
+    _, complaints = extract.validate_rows(rows, schema=("modes", "platform", "gate_type"))
+    assert complaints == [], f"descriptive text must not be digit-checked: {complaints}"
+
+
+def test_numeric_fields_are_still_checked():
+    rows = [{"cite_key": "X", "fidelity_pct": 99.9, "source_quote": "The device was cooled to 10 mK."}]
+    _, complaints = extract.validate_rows(rows, schema=("fidelity_pct",))
+    assert len(complaints) == 1 and "fidelity_pct" in complaints[0]
+
+
+def test_is_numeric_distinguishes_measurements_from_prose():
+    for value in (125, 99.92, "125", "99.92", " 1.3 ", "95.5%", "2e3"):
+        assert extract.is_numeric(value), f"should be numeric: {value!r}"
+    for value in ("two 3D cavities", "superconducting, 3D cavity", "beam splitter",
+                  "three-wave", "", None):
+        assert not extract.is_numeric(value), f"should not be numeric: {value!r}"
+
+
+def test_a_flagged_row_is_kept_not_dropped():
+    """A weak quote is a prompt for a human, not grounds for discarding a measurement."""
+    rows = [{"cite_key": "X", "fidelity_pct": 99.9, "source_quote": "Cooled to 10 mK."}]
+    accepted, complaints = extract.validate_rows(rows, schema=("fidelity_pct",))
+    assert len(accepted) == 1 and len(complaints) == 1
+
+
+def test_a_verdict_without_a_checksum_is_counted_as_unverified():
+    """Corpus positions shift whenever dedup or triage changes, and an unverifiable
+    verdict silently follows the shift. 64 stale verdicts once landed on the wrong works
+    with nothing to catch them, because they predated the checksum."""
+    corpus = corpus_of(2)
+    counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "x"}})
+    assert counts["unverified"] == 1
+    assert len(screen.included(corpus)) == 1, "still applied, for backward compatibility"
+
+
+def test_a_checksummed_verdict_is_not_counted_as_unverified():
+    corpus = corpus_of(2)
+    counts = screen.apply_verdicts(
+        corpus, {0: {"verdict": "include", "reason": "x", "t": "paper number 0"}}
+    )
+    assert counts["unverified"] == 0

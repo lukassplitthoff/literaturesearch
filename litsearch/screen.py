@@ -186,9 +186,17 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
     review queue. ``keep_rule_verdicts=False`` forces a clean slate when re-screening from
     scratch.
     """
-    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0, "misaligned": 0}
+    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0,
+              "misaligned": 0, "unverified": 0}
     for index, work in enumerate(corpus.works):
         row = verdicts.get(index)
+        if row is not None and not row.get("t"):
+            # No checksum to verify against. Accepted for compatibility with verdicts
+            # written before the checksum existed, but counted: corpus positions shift
+            # whenever dedup or triage changes, and an unverifiable verdict silently
+            # follows the shift. This actually happened -- 64 stale verdicts landed on
+            # the wrong works and nothing caught them.
+            counts["unverified"] += 1
         if row is not None and not _title_echo_matches(row.get("t", ""), work.title):
             # The verdict names a different paper than the index points at. Refusing it is
             # the whole point: a misaligned batch once produced a clean-looking, fully
