@@ -39,16 +39,28 @@ ABSTRACT_CHARS = 600
 INSTRUCTIONS = (
     "For each work below, decide whether it meets the inclusion criteria. "
     "Reply with one JSON object per line and nothing else: "
-    '{"index": <int>, "t": "<first 4 words of that work\'s title>", '
+    '{"index": <the work\'s "i">, "t": <the work\'s "c", copied verbatim>, '
     '"verdict": "include|exclude|unsure", "reason": "<one short clause>"}. '
-    "The 't' field is a checksum: copy it from the work you are judging so a "
-    "misaligned verdict is caught rather than silently applied to another paper. "
+    "Copy 'c' exactly as given -- do not derive, retype or reformat it. It is a checksum "
+    "that catches a verdict applied to the wrong paper, and a wrong one is rejected. "
     "Use 'unsure' when the abstract does not say enough to decide -- that is a real answer, "
     "not a failure. Judge relevance only; do not judge whether the paper is correct."
 )
 
 # How much of the echoed title must match before a verdict is trusted.
 TITLE_CHECK_RATIO = 0.7
+
+# Words of the title used as the checksum. Precomputed and shipped in the batch rather
+# than described in prose: asking a screener to derive "the first four words" was ambiguous
+# for titles like "1 / f noise:" or ones shorter than four words, and invited retyping --
+# and a retyped checksum that drifts is a false alarm.
+CHECKSUM_WORDS = 4
+
+
+def checksum(title: str) -> str:
+    """The value a screener must echo back to prove a verdict names the right work."""
+    words = [w for w in re.split(r"\W+", (title or "").lower()) if w]
+    return " ".join(words[:CHECKSUM_WORDS])
 
 
 def work_summary(work: Work, index: int, abstract_chars: int = ABSTRACT_CHARS) -> dict:
@@ -57,7 +69,7 @@ def work_summary(work: Work, index: int, abstract_chars: int = ABSTRACT_CHARS) -
     Short keys and a truncated abstract, because this structure is repeated once per work
     and the field names are paid for every time.
     """
-    summary = {"i": index, "t": work.title}
+    summary = {"i": index, "t": work.title, "c": checksum(work.title)}
     if work.year:
         summary["y"] = work.year
     abstract = (work.abstract or "").strip()

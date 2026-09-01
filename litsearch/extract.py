@@ -18,6 +18,9 @@ from pathlib import Path
 from litsearch.sources.base import Work
 
 INSTRUCTIONS = (
+    "Read the paper, preferring 'arxiv_pdf_url' if present -- publisher PDF links are "
+    "usually paywalled or blocked, while the arXiv preprint of the same work is open. "
+    "Reading the preprint counts as full_text; say which version you read in 'note'. "
     "Extract the requested fields from this paper. Emit one JSON object per distinct "
     "measurement -- a paper reporting several devices or several qubits yields several "
     "rows. Every value MUST be accompanied by 'source_quote', the sentence from the paper "
@@ -39,8 +42,20 @@ DEFAULT_SCHEMA = (
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
+def arxiv_pdf_url(arxiv_id: str | None) -> str:
+    """The arXiv PDF for an id, or '' when there is none."""
+    return f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else ""
+
+
 def task_for(work: Work, cite_key: str, schema: tuple[str, ...]) -> dict:
-    """One extraction task: the paper, where to read it, and the columns to fill."""
+    """One extraction task: the paper, where to read it, and the columns to fill.
+
+    Two PDF routes are offered, because the publisher one usually fails. On the first real
+    extraction run every publisher URL was unfetchable -- APS returned 403 and Nature
+    redirected into an auth flow -- while the arXiv preprint of the same paper was open.
+    ``has_open_access_pdf`` is true in the OA-status sense and still useless operationally,
+    so it is no longer the only thing an extractor is given.
+    """
     return {
         "instructions": INSTRUCTIONS,
         "cite_key": cite_key,
@@ -48,7 +63,8 @@ def task_for(work: Work, cite_key: str, schema: tuple[str, ...]) -> dict:
         "doi": work.doi,
         "arxiv_id": work.arxiv_id,
         "pdf_url": work.oa_pdf_url or "",
-        "has_open_access_pdf": bool(work.oa_pdf_url),
+        "arxiv_pdf_url": arxiv_pdf_url(work.arxiv_id),
+        "has_open_access_pdf": bool(work.oa_pdf_url or work.arxiv_id),
         "abstract": work.abstract or "",
         "schema": list(schema),
     }

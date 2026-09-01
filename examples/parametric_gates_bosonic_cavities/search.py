@@ -69,7 +69,12 @@ INCLUSION_CRITERIA = (
     "Reports a parametric gate or parametric interaction between bosonic modes -- a "
     "microwave cavity, resonator or bosonic-encoded qubit. Beam splitter, two-mode "
     "squeezing, frequency conversion, SNAP, conditional displacement, controlled-SWAP "
-    "and similar count. Both experiment and gate-design theory are in scope."
+    "and similar count. Both experiment and gate-design theory are in scope. "
+    "The interaction must be DRIVE-ACTIVATED: a pump or flux modulation turns it on. An "
+    "always-on static coupling (bare cross-Kerr, bare dispersive shift) does not qualify "
+    "on its own, but engineering such a term with a drive does. A parametric drive between "
+    "two TWO-LEVEL qubits does not qualify either -- at least one side must be a bosonic "
+    "mode."
 )
 EXCLUSION_CRITERIA = (
     "Gates between two-level qubits only, with no bosonic mode; non-superconducting "
@@ -191,7 +196,8 @@ def main() -> int:
     report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known)
     entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", included or passed)
     errors = [f for f in findings if f.level == "error"]
-    export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted)
+    export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted,
+                              columns=export.columns_for(EXTRACTION_SCHEMA))
     print(f"  corpus {len(corpus)} | validated {len(passed)} | quarantined {held}")
     print(f"  refs.bib: {entry_count} entries, {len(errors)} errors")
     for finding in errors[:5]:

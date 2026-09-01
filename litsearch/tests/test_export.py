@@ -168,3 +168,18 @@ def test_authorless_work_is_dropped_and_reported(tmp_path):
     assert count == 1, "the authorless work must not reach the bibliography"
     assert [w.title for w in uncitable] == ["Quantum Noise in Mesoscopic Physics"]
     assert [f for f in findings if f.level == "error"] == [], "and it must not leave an error behind"
+
+
+def test_evidence_columns_follow_the_search_schema(tmp_path):
+    """DictWriter drops keys it was not told about, so a mismatched column list writes a
+    table of empty columns while reporting success -- seen live on the first real run."""
+    from litsearch.export import columns_for
+
+    schema = ("gate_type", "coupler", "fidelity_pct")
+    rows = [{"cite_key": "Chapman2023", "gate_type": "beam splitter", "coupler": "SNAIL",
+             "fidelity_pct": 99.9, "source_quote": "a 50:50 beamsplitter in 125 ns", "confidence": "full_text"}]
+    path = tmp_path / "evidence.csv"
+    assert write_evidence_csv(path, rows, columns=columns_for(schema)) == 1
+    body = path.read_text(encoding="utf-8")
+    assert "gate_type" in body and "beam splitter" in body and "SNAIL" in body
+    assert "T1_us" not in body, "the default schema must not leak into another search"

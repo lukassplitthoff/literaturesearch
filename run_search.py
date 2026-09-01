@@ -205,7 +205,8 @@ def main() -> int:
     bib_works = included or passed
     entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
     errors = [f for f in findings if f.level == "error"]
-    kept = export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted)
+    kept = export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted,
+                                     columns=export.columns_for(EXTRACTION_SCHEMA))
 
     print(f"  corpus {len(corpus)} works -> {cfg.out_dir}")
     print(f"  {len(passed)} validated, {held} quarantined")

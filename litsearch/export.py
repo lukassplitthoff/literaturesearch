@@ -157,20 +157,19 @@ def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tupl
     return len(database.entries), findings, uncitable
 
 
-EVIDENCE_COLUMNS = (
-    "cite_key",
-    "doi",
-    "year",
-    "qubit_type",
-    "material",
-    "substrate",
-    "T1_us",
-    "T2_star_us",
-    "T2_echo_us",
-    "temperature_mK",
-    "source_quote",
-    "confidence",
-)
+# Columns every extraction table carries, whatever the question. The subject-specific
+# fields come from the search's own schema and are inserted between these.
+LEADING_COLUMNS = ("cite_key", "doi", "year")
+TRAILING_COLUMNS = ("source_quote", "confidence", "note")
+
+# The T1/T2 example's schema, kept as the default only so a bare call still works.
+DEFAULT_SCHEMA = ("qubit_type", "material", "substrate", "T1_us", "T2_star_us", "T2_echo_us", "temperature_mK")
+EVIDENCE_COLUMNS = LEADING_COLUMNS + DEFAULT_SCHEMA + TRAILING_COLUMNS
+
+
+def columns_for(schema: tuple[str, ...]) -> tuple[str, ...]:
+    """Full column order for a given extraction schema."""
+    return LEADING_COLUMNS + tuple(schema) + TRAILING_COLUMNS
 
 
 def write_evidence_csv(path: Path, rows: list[dict], columns: tuple[str, ...] = EVIDENCE_COLUMNS) -> int:
@@ -178,6 +177,10 @@ def write_evidence_csv(path: Path, rows: list[dict], columns: tuple[str, ...] = 
 
     A value nobody can quote is not evidence. Dropping those here means the guarantee
     holds no matter how stage 6 behaved.
+
+    ``columns`` must match the schema the extractor was given -- DictWriter drops any key
+    it was not told about, so a mismatched column list silently discards every extracted
+    field and leaves a table of empty columns. Use ``columns_for(schema)``.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

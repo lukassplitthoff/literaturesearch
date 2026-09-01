@@ -34,7 +34,7 @@ def test_batches_expose_only_title_and_abstract(tmp_path):
     corpus = corpus_of(1)
     corpus.works[0].oa_pdf_url = "https://example.org/secret.pdf"
     payload = json.loads(screen.prepare_batches(corpus, "a", "b", tmp_path)[0].read_text(encoding="utf-8"))
-    assert set(payload["works"][0]) <= {"i", "t", "y", "a"}, "only index, title, year, abstract"
+    assert set(payload["works"][0]) <= {"i", "t", "y", "a", "c"}, "index, title, checksum, year, abstract"
 
 
 def test_stale_batches_are_cleared(tmp_path):
@@ -283,3 +283,45 @@ def test_titles_differing_in_one_token_are_distinguished():
         corpus, {0: {"verdict": "include", "reason": "x", "t": "Coherence in transmon qubits Part II"}}
     )
     assert counts["misaligned"] == 1
+
+
+def test_the_checksum_is_precomputed_in_the_batch(tmp_path):
+    """Asking a screener to derive 'the first four words' was ambiguous for titles like
+    '1 / f noise:' and for titles shorter than four words, and invited retyping."""
+    corpus = Corpus()
+    corpus.add(Work(title="1 / f noise: Implications for solid-state quantum information", doi="10.1/a"))
+    corpus.add(Work(title="Quantum simulation", doi="10.1/b"))
+    payload = json.loads(screen.prepare_batches(corpus, "a", "b", tmp_path)[0].read_text(encoding="utf-8"))
+    assert payload["works"][0]["c"] == "1 f noise implications"
+    assert payload["works"][1]["c"] == "quantum simulation", "a short title must still yield a checksum"
+
+    # And the value it ships is exactly what apply_verdicts will accept.
+    counts = screen.apply_verdicts(
+        corpus, {1: {"verdict": "include", "reason": "x", "t": payload["works"][1]["c"]}}
+    )
+    assert counts["misaligned"] == 0 and len(screen.included(corpus)) == 1
+
+
+def test_task_offers_the_arxiv_pdf_as_well(tmp_path):
+    """Every publisher PDF url failed on the first real extraction run: APS 403, Nature
+    redirected into auth. The arXiv preprint of the same paper was open."""
+    work = Work(title="A paper", doi="10.1103/x", arxiv_id="2303.00959",
+                oa_pdf_url="http://link.aps.org/pdf/10.1103/x")
+    payload = json.loads(extract.prepare_tasks([work], tmp_path)[0].read_text(encoding="utf-8"))
+    assert payload["arxiv_pdf_url"] == "https://arxiv.org/pdf/2303.00959"
+    assert payload["pdf_url"].startswith("http://link.aps.org")
+
+
+def test_a_work_with_only_an_arxiv_id_counts_as_reachable(tmp_path):
+    work = Work(title="A preprint", arxiv_id="2101.00001")
+    payload = json.loads(extract.prepare_tasks([work], tmp_path)[0].read_text(encoding="utf-8"))
+    assert payload["has_open_access_pdf"] is True
+    assert payload["arxiv_pdf_url"].endswith("2101.00001")
+
+
+def test_a_work_with_neither_is_marked_unreachable(tmp_path):
+    payload = json.loads(
+        extract.prepare_tasks([Work(title="Paywalled", doi="10.1/b")], tmp_path)[0].read_text(encoding="utf-8")
+    )
+    assert payload["has_open_access_pdf"] is False
+    assert payload["arxiv_pdf_url"] == ""
