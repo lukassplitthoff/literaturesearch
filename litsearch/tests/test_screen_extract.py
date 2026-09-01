@@ -160,3 +160,36 @@ def test_load_rows_skips_malformed_lines(tmp_path):
 
 def test_load_rows_on_missing_file(tmp_path):
     assert extract.load_rows(tmp_path / "nope.jsonl") == []
+
+
+# ---------------------------------------------------------------- output location safety
+
+
+def test_out_root_honours_the_environment(monkeypatch, tmp_path):
+    from litsearch import config
+
+    monkeypatch.setenv(config.OUT_DIR_ENV, str(tmp_path / "elsewhere"))
+    assert config.out_root() == tmp_path / "elsewhere"
+    assert config.run_dir("myrun") == tmp_path / "elsewhere" / "myrun"
+
+
+def test_out_root_defaults_outside_the_repository(monkeypatch):
+    """Run outputs are data and must never be committed, so the default is under $HOME."""
+    from pathlib import Path
+
+    from litsearch import config
+
+    monkeypatch.delenv(config.OUT_DIR_ENV, raising=False)
+    root = config.out_root()
+    assert root == Path.home() / "litsearch-runs"
+    assert config.warn_if_inside_repo(root) == "", "the default must not sit inside the repo"
+
+
+def test_a_path_inside_the_repository_is_flagged():
+    from pathlib import Path
+
+    from litsearch import config
+
+    inside = Path(config.__file__).resolve().parent / "some_run_output"
+    warning = config.warn_if_inside_repo(inside)
+    assert "must never be committed" in warning

@@ -6,8 +6,58 @@ Edit ``run_search.py`` to change a run.
 
 from __future__ import annotations
 
+import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Where run outputs go. Search results are data, not source: they are large, they change
+# on every run, and they must never end up in a commit. The default is therefore OUTSIDE
+# the repository entirely, so a stray `git add -A` cannot pick them up.
+OUT_DIR_ENV = "LITSEARCH_OUT_DIR"
+DEFAULT_OUT_ROOT = Path.home() / "litsearch-runs"
+
+
+def out_root() -> Path:
+    """The directory runs are written under: $LITSEARCH_OUT_DIR, else ~/litsearch-runs."""
+    configured = os.environ.get(OUT_DIR_ENV, "").strip()
+    return Path(configured).expanduser() if configured else DEFAULT_OUT_ROOT
+
+
+def run_dir(name: str) -> Path:
+    """The output directory for one named run."""
+    return out_root() / name
+
+
+def _repo_root() -> Path | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5,
+            cwd=Path(__file__).resolve().parent,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return Path(result.stdout.strip()) if result.returncode == 0 and result.stdout.strip() else None
+
+
+def warn_if_inside_repo(path: Path) -> str:
+    """Return a warning if outputs would land inside the git repository, else ''.
+
+    Not an error -- someone may deliberately want a run beside the code -- but it is
+    always worth saying out loud, because the failure mode is committing a corpus.
+    """
+    repo = _repo_root()
+    if repo is None:
+        return ""
+    try:
+        Path(path).resolve().relative_to(repo.resolve())
+    except ValueError:
+        return ""
+    return (
+        f"output directory {path} is inside the git repository at {repo}. "
+        f"Run outputs must never be committed. Set {OUT_DIR_ENV} to a path outside the repo."
+    )
 
 # Sources that need no credential. NASA ADS is deliberately absent: it needs a token,
 # and it is deferred until one exists. See litsearch/sources/ads.py.
@@ -38,7 +88,7 @@ class SearchConfig:
     saturation_threshold: float = DEFAULT_SATURATION_THRESHOLD
     known_items: list[str] = field(default_factory=list)
     mailto: str = ""
-    out_dir: Path = Path("runs/latest")
+    out_dir: Path = field(default_factory=lambda: run_dir("latest"))
     offline: bool = False
 
     def __post_init__(self) -> None:

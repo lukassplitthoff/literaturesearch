@@ -25,7 +25,7 @@ from pathlib import Path
 
 from bibcheck.verify import IndexClient
 from litsearch import export, extract, report, retrieve, screen, snowball
-from litsearch.config import SearchConfig
+from litsearch.config import OUT_DIR_ENV, SearchConfig, run_dir, warn_if_inside_repo
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
 
@@ -78,7 +78,11 @@ EXTRACTION_SCHEMA = (
 
 MAILTO = ""  # your address puts Crossref/OpenAlex requests in the polite pool
 OFFLINE = False  # True replays the on-disk cache and opens no connection
-OUT_DIR = Path("runs/t1_t2_superconducting_qubits")
+
+# Outputs land OUTSIDE the repository by default -- see litsearch/config.py. Override the
+# location with the LITSEARCH_OUT_DIR environment variable, not by editing this line.
+RUN_NAME = "t1_t2_superconducting_qubits"
+OUT_DIR = run_dir(RUN_NAME)
 # ---------------------------------------------------------------------------------------
 
 
@@ -98,11 +102,15 @@ def main() -> int:
         out_dir=OUT_DIR,
         offline=OFFLINE,
     )
+    warning = warn_if_inside_repo(cfg.out_dir)
+    if warning:
+        print(f"  [WARN] {warning}")
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     fetcher = Fetcher(cache_path=cfg.cache_path, mailto=cfg.mailto, offline=cfg.offline)
 
     print(f"question: {cfg.question}")
     print(f"sources : {', '.join(cfg.sources)}")
+    print(f"output  : {cfg.out_dir}  (override with ${OUT_DIR_ENV})")
 
     print("\n[1/7] retrieve")
     corpus = retrieve.run(fetcher, cfg)

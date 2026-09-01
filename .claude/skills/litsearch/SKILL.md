@@ -29,6 +29,9 @@ entry.
 ## Read first
 
 - `README.md` - the eight stages and what each produces
+- `docs/OUTPUT_FORMATS.md` - **the output contract**: what every format must obey, and the
+  specific rules for refs.bib, evidence.csv, review.md, lecture notes and slides. Read it
+  before writing any deliverable.
 - `litsearch/config.py` - every knob, and what the defaults mean
 - `run_search.py` - the CONFIG block you will edit
 
@@ -55,7 +58,7 @@ Turn the question into 3 to 6 query strings that use *different vocabulary for t
 idea* - this is where recall is won or lost. For coherence times: "T1 T2 coherence",
 "relaxation time", "energy relaxation", "qubit lifetime", "dephasing" all find different
 papers. Write them into `QUERIES` in `run_search.py`, along with `KNOWN_ITEMS`,
-`YEAR_FROM` and `OUT_DIR`.
+`YEAR_FROM` and `RUN_NAME`.
 
 Also write down the inclusion and exclusion criteria explicitly, in one or two sentences
 each. The screener needs them and cannot invent them.
@@ -70,7 +73,7 @@ Retrieval, dedup, snowballing and the validation gate are pure Python and involv
 model. Do not attempt to do this part yourself with WebSearch - you would lose the
 caching, the dedup and the gate.
 
-Read `runs/<name>/run.json` afterwards and check two things:
+Read `$LITSEARCH_OUT_DIR/<name>/run.json` afterwards and check two things:
 
 - **Known items.** A `MISS` means retrieval is incomplete. Add vocabulary to `QUERIES`
   and run again before going any further. Report a persistent miss to the user; do not
@@ -100,19 +103,21 @@ quote is empty. Do not bypass it.
 ### Stage 7 - Report
 
 `run_search.py` already writes `corpus.jsonl`, `refs.bib`, `shortlist.md`,
-`quarantine.md` and `run.json`. Add `evidence.csv` from stage 6, and write `review.md`
-yourself: a synthesis where every claim carries a cite key that appears in `refs.bib`,
-and every number traces to a row in `evidence.csv`.
+`quarantine.md`, `needs_review.md` and `run.json`, into `$LITSEARCH_OUT_DIR` (default
+`~/litsearch-runs/<name>/`) -- **outside the repository**, because run outputs are data and
+must never be committed.
 
-State what the evidence does not cover. A literature search that reports only what it
-found, without saying where it is thin, is misleading.
+Add `evidence.csv` from stage 6, then write whichever deliverable was asked for. The rules
+for each are in `docs/OUTPUT_FORMATS.md` and are not negotiable: every claim carries a cite
+key present in `refs.bib`, every number traces to an `evidence.csv` row, nothing that
+failed the gate appears, and every format ends by stating what the search did not cover.
 
 ## After
 
 Verify before reporting done:
 
 ```bash
-python -m bibcheck.main runs/<name>/refs.bib --verify
+python -m bibcheck.main "$LITSEARCH_OUT_DIR/<name>/refs.bib" --verify
 ```
 
 Exit code 0 or 1 is fine; 2 means the bibliography has errors and is not finished.
