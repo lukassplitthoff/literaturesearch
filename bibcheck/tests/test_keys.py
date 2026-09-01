@@ -1,6 +1,6 @@
 """Tests for LastnameYEAR key generation and ASCII folding.
 
-Run:  python -m pytest lib/utils/bibcheck/tests/test_keys.py -q
+Run:  python -m pytest bibcheck/tests/test_keys.py -q
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.utils.bibcheck.keys import (
+from bibcheck.keys import (
     assign_keys,
     entry_year,
     first_author_surname,
@@ -20,7 +20,7 @@ from lib.utils.bibcheck.keys import (
     split_authors,
     strip_latex,
 )
-from lib.utils.bibcheck.parser import loads, read
+from bibcheck.parser import loads, read
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.bib"
 

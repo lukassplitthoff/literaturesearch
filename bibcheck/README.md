@@ -10,21 +10,20 @@ tool reports a rename map instead, and you apply it.
 ## Quick start
 
 ```bash
-PY="C:/Users/lukassp/AppData/Local/anaconda3/envs/msmt202q/python.exe"
-cd c:/Users/lukassp/Documents/conda_envs/msmt202q/qt-codebase
+pip install -e .
 
 # report only, offline, no files written
-$PY -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib --no-write
+python -m bibcheck.main path/to/refs.bib --no-write
 
 # write the cleaned copy plus the reports
-$PY -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib --out-dir ./bibcheck_out
+python -m bibcheck.main path/to/refs.bib --out-dir ./bibcheck_out
 
 # also cross-check every entry against Crossref, arXiv and OpenAlex
-$PY -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib \
+python -m bibcheck.main path/to/refs.bib \
     --verify --mailto you@example.com --out-dir ./bibcheck_out
 
 # and let the indexes fill the gaps they can fill
-$PY -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib \
+python -m bibcheck.main path/to/refs.bib \
     --verify --fix-from-index --mailto you@example.com --out-dir ./bibcheck_out
 ```
 
@@ -157,7 +156,7 @@ Crossref.
 ## Options
 
 ```
-python -m lib.utils.bibcheck.main INPUT.bib
+python -m bibcheck.main INPUT.bib
     --out PATH            output .bib path (default: <stem>_checked.bib beside the input)
     --out-dir DIR         directory for all outputs
     --force               overwrite output files that already exist
@@ -176,7 +175,7 @@ python -m lib.utils.bibcheck.main INPUT.bib
 ## Tests
 
 ```bash
-$PY -m pytest lib/utils/bibcheck/tests -q
+python -m pytest bibcheck/tests -q
 ```
 
 No test opens a socket: `test_verify.py` drives the client with `offline=True` over a
@@ -193,6 +192,5 @@ pre-seeded cache of recorded Crossref/arXiv/OpenAlex payloads.
 | `report.py` | ASCII console output, Markdown, JSON, plain-text export |
 | `main.py` | argparse CLI |
 
-`requests` is the only third-party dependency, and it is already in the `msmt202q`
-environment. No BibTeX library is used: `bibtexparser` is not installed here, and its v1
+`requests` is the only third-party dependency. No BibTeX library is used: `bibtexparser`'s v1
 API normalises exactly the LaTeX escapes this package needs to preserve.

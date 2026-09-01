@@ -1,6 +1,6 @@
 """End-to-end tests for the CLI.
 
-Run:  python -m pytest lib/utils/bibcheck/tests/test_main.py -q
+Run:  python -m pytest bibcheck/tests/test_main.py -q
 
 These run entirely offline: --verify is never passed, so no socket is opened.
 """
@@ -11,8 +11,8 @@ import json
 import shutil
 from pathlib import Path
 
-from lib.utils.bibcheck.main import main
-from lib.utils.bibcheck.parser import read
+from bibcheck.main import main
+from bibcheck.parser import read
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.bib"
 

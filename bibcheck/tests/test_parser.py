@@ -1,6 +1,6 @@
 """Tests for the BibTeX reader/writer.
 
-Run:  python -m pytest lib/utils/bibcheck/tests/test_parser.py -q
+Run:  python -m pytest bibcheck/tests/test_parser.py -q
 
 The point of these tests is fidelity: a value that goes in must come out byte for byte,
 because the group's bibliographies carry LaTeX escapes and brace-protected proper nouns
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.utils.bibcheck.parser import BibParseError, CommentBlock, dumps, loads, read
+from bibcheck.parser import BibParseError, CommentBlock, dumps, loads, read
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.bib"
 
@@ -157,7 +157,7 @@ def test_global_sort_hoists_banners_and_flattens():
 
 
 def test_write_produces_a_readable_file(tmp_path: Path):
-    from lib.utils.bibcheck.parser import write
+    from bibcheck.parser import write
 
     out = write(read(FIXTURE), tmp_path / "out.bib")
     assert _values(read(out)) == _values(read(FIXTURE))

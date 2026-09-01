@@ -1,14 +1,14 @@
 """Tests for the normalisation and completeness rules.
 
-Run:  python -m pytest lib/utils/bibcheck/tests/test_rules.py -q
+Run:  python -m pytest bibcheck/tests/test_rules.py -q
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from lib.utils.bibcheck.parser import loads, read
-from lib.utils.bibcheck.rules import (
+from bibcheck.parser import loads, read
+from bibcheck.rules import (
     check_database,
     check_duplicate_entries,
     check_duplicate_keys,
@@ -182,7 +182,7 @@ def test_editing_placeholder_is_an_error():
 
 
 def test_placeholder_author_does_not_produce_a_nonsense_key():
-    from lib.utils.bibcheck.keys import make_key
+    from bibcheck.keys import make_key
 
     entry = _entry("author = {{TO VERIFY: author list not confirmed}}, title = {T}, year = {2025}")
     key, problem = make_key(entry)
@@ -306,7 +306,7 @@ def test_ascii_mode_is_off_by_default():
 def test_ascii_mode_clears_the_non_ascii_warning_end_to_end():
     db = loads("@article{k, author = {S\u00e9pulcre, Th\u00e9o}, title = {T}, journal = {J}, year = {2025}}")
     check_database(db, ascii_only=True)
-    from lib.utils.bibcheck.parser import dumps
+    from bibcheck.parser import dumps
 
     assert dumps(db).isascii()
 

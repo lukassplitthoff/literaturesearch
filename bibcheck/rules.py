@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from lib.utils.bibcheck.keys import (
+from bibcheck.keys import (
     entry_year,
     first_author_surname,
     has_placeholder,
@@ -26,7 +26,7 @@ from lib.utils.bibcheck.keys import (
     normalize_title,
     split_authors,
 )
-from lib.utils.bibcheck.parser import ZERO_WIDTH, Database, Entry
+from bibcheck.parser import ZERO_WIDTH, Database, Entry
 
 # Fields without which the entry is not a usable reference.
 REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {

@@ -29,8 +29,8 @@ from pathlib import Path
 
 import requests
 
-from lib.utils.bibcheck.keys import entry_year, first_author_surname, normalize_title, strip_latex
-from lib.utils.bibcheck.rules import EntryReport, Finding
+from bibcheck.keys import entry_year, first_author_surname, normalize_title, strip_latex
+from bibcheck.rules import EntryReport, Finding
 
 CROSSREF_WORK = "https://api.crossref.org/works/{doi}"
 CROSSREF_SEARCH = "https://api.crossref.org/works"
@@ -180,7 +180,7 @@ class IndexClient:
         self.network_errors: list[str] = []
         self._last_request = 0.0
         self._session = requests.Session()
-        agent = "bibcheck/1.0 (https://bitbucket.org/qtlteam/qt-codebase)"
+        agent = "bibcheck/1.0 (https://github.com/lukassplitthoff/literaturesearch)"
         if mailto:
             agent += f" mailto:{mailto}"
         self._session.headers["User-Agent"] = agent

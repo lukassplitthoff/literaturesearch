@@ -1,6 +1,6 @@
 """Tests for index verification.
 
-Run:  python -m pytest lib/utils/bibcheck/tests/test_verify.py -q
+Run:  python -m pytest bibcheck/tests/test_verify.py -q
 
 No test here opens a socket. The IndexClient is constructed with ``offline=True`` and a
 pre-seeded cache, which is exactly the code path ``--offline`` uses, so the response
@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from lib.utils.bibcheck.parser import loads
-from lib.utils.bibcheck.rules import check_entry, normalize_entry
-from lib.utils.bibcheck.verify import (
+from bibcheck.parser import loads
+from bibcheck.rules import check_entry, normalize_entry
+from bibcheck.verify import (
     VERDICT_MISMATCHED,
     VERDICT_NOT_FOUND,
     VERDICT_VERIFIED,
@@ -115,7 +115,7 @@ def test_crossref_record_normalisation():
 def test_arxiv_record_reports_the_published_doi():
     import xml.etree.ElementTree as ET
 
-    from lib.utils.bibcheck.verify import ATOM_NS
+    from bibcheck.verify import ATOM_NS
 
     node = ET.fromstring(ARXIV_ATOM).find("atom:entry", ATOM_NS)
     record = _record_from_arxiv(node)

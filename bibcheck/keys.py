@@ -16,7 +16,7 @@ import re
 import string
 import unicodedata
 
-from lib.utils.bibcheck.parser import Entry
+from bibcheck.parser import Entry
 
 # Single-token LaTeX commands that stand for a letter rather than modify one.
 _LATEX_LIGATURES = {

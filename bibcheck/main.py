@@ -16,8 +16,8 @@ input. Cite keys in ``.tex`` files are NOT rewritten; the rename map is reported
 
 Examples::
 
-    python -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib --no-write
-    python -m lib.utils.bibcheck.main ../sideband/manuscript/refs.bib \\
+    python -m bibcheck.main ../sideband/manuscript/refs.bib --no-write
+    python -m bibcheck.main ../sideband/manuscript/refs.bib \\
         --verify --mailto you@example.com --out-dir ./bibcheck_out
 """
 
@@ -29,11 +29,11 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from lib.utils.bibcheck import parser as bibparser
-from lib.utils.bibcheck import report as reporting
-from lib.utils.bibcheck.keys import assign_keys
-from lib.utils.bibcheck.rules import check_database
-from lib.utils.bibcheck.verify import IndexClient, apply_suggestions, verify_all
+from bibcheck import parser as bibparser
+from bibcheck import report as reporting
+from bibcheck.keys import assign_keys
+from bibcheck.rules import check_database
+from bibcheck.verify import IndexClient, apply_suggestions, verify_all
 
 DEFAULT_SORT = "sections"
 SUFFIX_BIB = "_checked.bib"
@@ -45,7 +45,7 @@ SUFFIX_CACHE = "_bibcheck_cache.json"
 
 def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="python -m lib.utils.bibcheck.main",
+        prog="python -m bibcheck.main",
         description="Unify keys, sort, check completeness and verify a BibTeX file.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

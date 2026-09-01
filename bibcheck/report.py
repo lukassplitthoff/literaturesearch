@@ -10,10 +10,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lib.utils.bibcheck.keys import entry_year, split_authors, strip_latex
-from lib.utils.bibcheck.parser import Database, Entry
-from lib.utils.bibcheck.rules import EntryReport, Finding
-from lib.utils.bibcheck.verify import Verification
+from bibcheck.keys import entry_year, split_authors, strip_latex
+from bibcheck.parser import Database, Entry
+from bibcheck.rules import EntryReport, Finding
+from bibcheck.verify import Verification
 
 LEVEL_ORDER = {"error": 0, "warning": 1, "info": 2}
 

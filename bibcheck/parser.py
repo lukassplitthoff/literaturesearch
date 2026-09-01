@@ -1,8 +1,6 @@
 """Minimal, byte-faithful BibTeX reader and writer built on the standard library only.
 
-Why not ``bibtexparser``: it is not installed in the ``msmt202q`` environment, and the
-poetry resolution for this repo is fragile (see the top-level README). More importantly,
-v1 normalises field values, which destroys the LaTeX escapes (``F\\"osel``, ``Lo{\\"i}ck``)
+Why not ``bibtexparser``: v1 normalises field values, which destroys the LaTeX escapes (``F\\"osel``, ``Lo{\\"i}ck``)
 and the brace-protected proper nouns (``{Hamiltonian}``, ``{SNAP}``) that the group's
 bibliographies rely on. This parser therefore carries every field value through
 *verbatim*: the inner text of a value is never decoded, re-encoded or re-wrapped.
