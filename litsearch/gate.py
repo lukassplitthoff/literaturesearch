@@ -85,15 +85,31 @@ def _confirm_title(work: Work, record, index: str) -> Verdict:
     )
 
 
-def validate_all(works: list[Work], client: IndexClient) -> tuple[list[Work], list[Verdict]]:
-    """Returns (works that passed, every verdict). Passed works carry their index."""
+def validate_all(
+    works: list[Work],
+    client: IndexClient,
+    save_every: int = 25,
+    progress_every: int = 25,
+) -> tuple[list[Work], list[Verdict]]:
+    """Returns (works that passed, every verdict). Passed works carry their index.
+
+    Validation is one throttled request per work, so a few hundred works takes a few
+    minutes. The cache is flushed every ``save_every`` works: without that, an interrupted
+    run throws away everything it fetched and the next run starts from nothing.
+    """
     verdicts = []
     passed = []
-    for work in works:
+    total = len(works)
+    for position, work in enumerate(works, start=1):
         verdict = validate(work, client)
         work.validation = verdict.status
         work.validation_source = verdict.index
         verdicts.append(verdict)
         if verdict.status == VERIFIED:
             passed.append(work)
+        if save_every and position % save_every == 0:
+            client.save_cache()
+        if progress_every and position % progress_every == 0:
+            print(f"    validated {position}/{total} ({len(passed)} verified so far)")
+    client.save_cache()
     return passed, verdicts

@@ -107,3 +107,27 @@ def test_title_similarity_is_symmetric_and_bounded():
     assert title_similarity("abc", "abc") == 1.0
     assert title_similarity("", "abc") == 0.0
     assert 0.0 <= title_similarity("superconducting qubit", "superconducting qubits") <= 1.0
+
+
+def test_near_identical_titles_with_different_dois_stay_separate():
+    """A paper and its companion, or Part I and Part II, must not collapse into one."""
+    corpus = Corpus()
+    corpus.add(make(title="Coherence in transmon qubits Part I", doi="10.1/part1"))
+    corpus.add(make(title="Coherence in transmon qubits Part II", doi="10.1/part2"))
+    assert len(corpus) == 2
+
+
+def test_near_identical_titles_with_different_arxiv_ids_stay_separate():
+    corpus = Corpus()
+    corpus.add(make(title="Qubit measurements v1", arxiv_id="2101.00001"))
+    corpus.add(make(title="Qubit measurements v2", arxiv_id="2202.00002"))
+    assert len(corpus) == 2
+
+
+def test_fuzzy_match_still_applies_when_only_one_side_has_a_doi():
+    """A DOI-less record from one index must still merge into the DOI-bearing one."""
+    corpus = Corpus()
+    corpus.add(make(doi="10.1/a", sources=["openalex"]))
+    corpus.add(make(sources=["inspire"]))
+    assert len(corpus) == 1
+    assert corpus.works[0].doi == "10.1/a"

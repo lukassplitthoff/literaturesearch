@@ -42,6 +42,14 @@ class Corpus:
         if not norm:
             return None
         for existing in self.works:
+            # A conflicting identifier settles it: two works with different DOIs are
+            # different papers, however alike their titles look. Without this, near-identical
+            # titles -- "... Part I" and "... Part II", a paper and its erratum, two devices
+            # from one group -- collapse into a single record and one of them is lost.
+            if work.doi and existing.doi and work.doi != existing.doi:
+                continue
+            if work.arxiv_id and existing.arxiv_id and work.arxiv_id != existing.arxiv_id:
+                continue
             if title_similarity(norm, existing.norm_title) >= TITLE_MATCH_RATIO:
                 return existing
         return None

@@ -2,9 +2,21 @@
 
     python run_search.py
 
-This is the deterministic spine only -- stages 1, 2, 3, 5 and the part of 7 that needs no
-model: retrieve, merge, snowball, validate, report. Screening and evidence extraction
-(stages 4 and 6) are the Claude-facing half and are not wired up yet.
+All seven stages. Retrieval, dedup, snowballing, validation and reporting run to
+completion here. The two stages that need a language model -- screening and evidence
+extraction -- are handled by handoff: this file writes task files, an agent answers them
+into `verdicts.jsonl` and `rows.jsonl`, and a second run consumes the answers. No model is
+ever called from this file.
+
+So a full search is:
+
+    python run_search.py                 # retrieves, validates, writes screening batches
+    # ... lit-screener answers runs/<name>/screen/verdicts.jsonl
+    python run_search.py                 # applies verdicts, writes extraction tasks
+    # ... lit-extractor answers runs/<name>/extract/rows.jsonl
+    python run_search.py                 # writes evidence.csv and the final refs.bib
+
+Re-running is cheap: every index response is cached on disk.
 """
 
 from __future__ import annotations
@@ -12,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from bibcheck.verify import IndexClient
-from litsearch import export, report, retrieve, snowball
+from litsearch import export, extract, report, retrieve, screen, snowball
 from litsearch.config import SearchConfig
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
@@ -43,6 +55,27 @@ REFS_PER_SEED = 4
 # the run says so. Leave empty to skip the check.
 KNOWN_ITEMS: list[str] = []
 
+# Stage 4 needs criteria a screener can apply from a title and abstract alone.
+INCLUSION_CRITERIA = (
+    "Reports a measured T1, T2*, or T2 echo coherence time for a superconducting qubit "
+    "or superconducting resonator/cavity, with an actual number."
+)
+EXCLUSION_CRITERIA = (
+    "Review articles without new measurements; theory-only papers with no measured device; "
+    "non-superconducting platforms (trapped ion, spin, photonic, NV centre)."
+)
+
+# Stage 6 columns. Every one of these must be quotable from the paper or it is recorded null.
+EXTRACTION_SCHEMA = (
+    "qubit_type",
+    "material",
+    "substrate",
+    "T1_us",
+    "T2_star_us",
+    "T2_echo_us",
+    "temperature_mK",
+)
+
 MAILTO = ""  # your address puts Crossref/OpenAlex requests in the polite pool
 OFFLINE = False  # True replays the on-disk cache and opens no connection
 OUT_DIR = Path("runs/t1_t2_superconducting_qubits")
@@ -71,20 +104,21 @@ def main() -> int:
     print(f"question: {cfg.question}")
     print(f"sources : {', '.join(cfg.sources)}")
 
-    print("\n[1/5] retrieve")
+    print("\n[1/7] retrieve")
     corpus = retrieve.run(fetcher, cfg)
+    fetcher.save_cache()  # flush before each long stage, so an interrupt costs nothing
 
-    print("\n[2/5] snowball")
+    print("\n[2/7] snowball")
     rounds = snowball.expand(fetcher, corpus, cfg)
+    fetcher.save_cache()
 
-    print("\n[3/5] validate (the gate)")
+    print("\n[3/7] validate (the gate)")
     client = IndexClient(cache_path=cfg.cache_path, mailto=cfg.mailto, offline=cfg.offline)
     passed, verdicts = validate_all(corpus.works, client)
-    client.save_cache()
     fetcher.save_cache()
     print(f"  {len(passed)} verified, {len(verdicts) - len(passed)} quarantined")
 
-    print("\n[4/5] known-item check")
+    print("\n[4/7] known-item check")
     known = report.known_item_results(corpus, cfg.known_items)
     for row in known:
         mark = "OK  " if row["found"] else "MISS"
@@ -92,18 +126,56 @@ def main() -> int:
     if not known:
         print("  (none configured)")
 
-    print("\n[5/5] write outputs")
+    print("\n[5/7] screen (stage 4)")
+    # Screening needs a model, which this file never calls. It writes batches and reads
+    # verdicts back, so the stage is resumable: run once to emit the batches, have the
+    # lit-screener subagent answer them, then run again to consume the answers.
+    screen_dir = cfg.out_dir / "screen"
+    batches = screen.prepare_batches(corpus, INCLUSION_CRITERIA, EXCLUSION_CRITERIA, screen_dir)
+    screen_counts = screen.apply_verdicts(corpus, screen.load_verdicts(screen_dir / "verdicts.jsonl"))
+    if screen_counts["unscreened"] == len(corpus):
+        print(f"  {len(batches)} batches written to {screen_dir}")
+        print(f"  no verdicts yet -- answer them into {screen_dir / 'verdicts.jsonl'}, then re-run")
+    else:
+        print(f"  include {screen_counts['include']}, exclude {screen_counts['exclude']}, "
+              f"unsure {screen_counts['unsure']}, unscreened {screen_counts['unscreened']}")
+    screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
+
+    print("\n[6/7] extract (stage 6)")
+    # Only works that BOTH passed the gate and were screened in are worth reading.
+    included = [work for work in screen.included(corpus) if work.validation == "verified"]
+    if not included:
+        included = passed if screen_counts["unscreened"] == len(corpus) else []
+        if included:
+            print("  no screening verdicts yet; preparing tasks for every validated work")
+    extract_dir = cfg.out_dir / "extract"
+    tasks = extract.prepare_tasks(included, extract_dir, schema=EXTRACTION_SCHEMA)
+    rows = extract.load_rows(extract_dir / "rows.jsonl")
+    accepted, complaints = extract.validate_rows(rows, schema=EXTRACTION_SCHEMA)
+    print(f"  {len(tasks)} extraction tasks in {extract_dir}")
+    if rows:
+        print(f"  {len(accepted)}/{len(rows)} rows accepted")
+        for complaint in complaints[:5]:
+            print(f"    [reject] {complaint}")
+    else:
+        print(f"  no rows yet -- answer the tasks into {extract_dir / 'rows.jsonl'}, then re-run")
+
+    print("\n[7/7] write outputs")
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
     report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known)
 
     # Only validated works go into the bibliography. Quarantined ones never appear.
-    entry_count, findings = export.write_bibtex(cfg.out_dir / "refs.bib", passed)
+    bib_works = included or passed
+    entry_count, findings = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
     errors = [f for f in findings if f.level == "error"]
+    kept = export.write_evidence_csv(cfg.out_dir / "evidence.csv", accepted)
+
     print(f"  corpus {len(corpus)} works -> {cfg.out_dir}")
     print(f"  {len(passed)} validated, {held} quarantined")
     print(f"  refs.bib: {entry_count} entries, {len(errors)} errors, {len(findings) - len(errors)} other findings")
+    print(f"  evidence.csv: {kept} rows with a source quote")
     for finding in errors[:5]:
         print(f"    [error] {finding.key}: {finding.message}")
 
