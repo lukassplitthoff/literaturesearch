@@ -9,6 +9,8 @@ description = "BibTeX validation (bibcheck) and an AI-assisted literature search
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Lukas Splitthoff", email = "lukas.splitthoff@gmail.com" }]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["requests>=2.28"]
 
 [project.optional-dependencies]
