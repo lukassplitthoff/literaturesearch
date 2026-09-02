@@ -6,6 +6,11 @@ The worked example. Everything below is from a real run, not a design sketch.
 python examples/parametric_gates_bosonic_cavities/search.py
 ```
 
+**Or open [`demo.ipynb`](demo.ipynb)** in this directory -- a runnable notebook with two
+things you can try in a couple of minutes: `bibcheck` catching a fabricated citation, and a
+small seeded search that finishes in about 25 seconds. It is committed without outputs, so
+what you see is what your run produced.
+
 ## Why this search is shaped the way it is
 
 The question is "what **other** gates", which makes it a **related-work** search, not a
