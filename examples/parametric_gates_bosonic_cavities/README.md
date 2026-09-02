@@ -72,6 +72,29 @@ Parametric gates found in superconducting microwave cavities, by interaction:
 rows, 3 controlled-SWAP, 3 three-photon SPDC, plus frequency conversion and detection --
 each with the sentence it came from.
 
+## Recall, measured against an independent list
+
+`gold_set.json` holds 15 parametric-beamsplitter papers compiled by a domain expert for a
+review, **without seeing any output of this pipeline**. That is what separates a
+measurement from the system agreeing with itself, and it is matched by DOI, so there is no
+similarity threshold to argue about.
+
+| Configuration | Recall |
+| --- | --- |
+| `refs_per_seed=12`, no vocabulary queries | 10/15 (67%) |
+| `refs_per_seed=40` + JRM / state-transfer queries | 12/15 (80%) |
+| **+ explicit seeds always expanded** | **15/15 (100%)** |
+
+The last step was a bug fix, not a tuning change. `seed_candidates` ranked round-0 works by
+citation count, so the 82-citation seed lost its place to 600-citation reviews the queries
+dragged in, and **a DOI-seeded search never walked its own seed's graph**. It failed
+silently -- the run returned a thousand works and looked healthy. Two gold papers sat at
+reference #6 and citer #6 of that unopened seed.
+
+100% on fifteen papers in one subfield is not a general claim about recall. It says the
+pipeline can find what an expert expects on the question it was pointed at, which is the
+most that a gold set of this size supports.
+
 ## Scope decision you should know about
 
 An optical cavity is also a bosonic cavity, and optomechanics is genuinely parametric. The

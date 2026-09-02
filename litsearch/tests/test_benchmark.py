@@ -73,7 +73,7 @@ def test_the_fixture_retains_every_gold_paper_the_corpus_had():
     recall number becomes an artifact of fixture construction rather than of retrieval --
     which it briefly was, reporting 53% against a real 67%."""
     metrics = benchmark.measure()
-    assert metrics["gold_found"] == 10, (
-        "the frozen corpus contained 10 of the 15 gold papers; a different number means "
+    assert metrics["gold_found"] == 15, (
+        "the frozen corpus contained all 15 gold papers; a different number means "
         "the fixture was rebuilt without preserving them"
     )
