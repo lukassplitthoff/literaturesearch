@@ -57,6 +57,12 @@ class SearchSpec:
     # Titles that must appear if retrieval works. A miss fails the run.
     known_items: list[str] = field(default_factory=list)
 
+    # Path to a gold set: papers a domain expert says must be found, matched by DOI.
+    # Unlike known_items these are chosen without seeing the output, so recall against
+    # them is a real measurement. A miss is reported, not fatal -- the point is to know
+    # the number and watch it move.
+    gold_set: str = ""
+
     # Stage 4. Written for a screener that sees only a title and an abstract.
     inclusion_criteria: str = ""
     exclusion_criteria: str = ""
@@ -124,7 +130,16 @@ def run(spec: SearchSpec) -> int:
         mark = "OK  " if row["found"] else "MISS"
         print(f"  [{mark}] {row['wanted'][:62]} (similarity {row['similarity']})")
     if not known:
-        print("  (none configured)")
+        print("  known items: (none configured)")
+
+    gold_result = None
+    if spec.gold_set:
+        gold_result = report.gold_recall(corpus, report.load_gold_set(spec.gold_set))
+        print(f"  gold set: {gold_result['found']}/{gold_result['total']} found "
+              f"({gold_result['recall_pct']}% recall)")
+        for row in gold_result["rows"]:
+            mark = "OK  " if row["found"] else "MISS"
+            print(f"    [{mark}] {row['key']:30s} {row['screen']}")
 
     print("\n[5/7] screen")
     screen_dir = cfg.out_dir / "screen"
@@ -174,7 +189,8 @@ def run(spec: SearchSpec) -> int:
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
-    report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known)
+    report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known,
+                         gold=gold_result)
 
     # Only validated works reach the bibliography. Quarantined ones never appear.
     entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", included or passed)

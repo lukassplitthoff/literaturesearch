@@ -428,3 +428,33 @@ def test_a_relocated_verdict_is_not_also_counted_as_misaligned():
     assert counts["realigned"] == 1
     assert counts["misaligned"] == 0, "one verdict must not be counted twice"
     assert counts["unscreened"] == 2, "papers 0 and 1 are simply unscreened"
+
+
+# ------------------------------------------------------------------ gold-set recall
+
+
+def test_gold_recall_matches_on_doi_not_title():
+    """DOIs are exact. Title matching would need a threshold to argue about."""
+    from litsearch import report
+
+    corpus = Corpus()
+    corpus.add(Work(title="A completely different title", doi="10.1/found"))
+    gold = [{"key": "a", "doi": "https://doi.org/10.1/FOUND", "title": "Whatever"},
+            {"key": "b", "doi": "10.1/absent", "title": "Missing paper"}]
+    result = report.gold_recall(corpus, gold)
+    assert result["found"] == 1 and result["missed"] == ["b"]
+    assert result["recall_pct"] == 50.0
+
+
+def test_gold_recall_separates_not_found_from_screened_out():
+    """A paper found but screened out is a different failure from one never retrieved,
+    and conflating them hides which half of the pipeline needs work."""
+    from litsearch import report
+
+    corpus = Corpus()
+    corpus.add(Work(title="Found but rejected", doi="10.1/a"))
+    screen.apply_verdicts(corpus, {0: {"verdict": "exclude", "reason": "x", "t": "found but rejected"}})
+    result = report.gold_recall(corpus, [{"key": "a", "doi": "10.1/a"}])
+    assert result["found"] == 1
+    assert result["missed"] == []
+    assert result["found_but_screened_out"] == ["a"]

@@ -9,15 +9,18 @@ It measures the parts of the pipeline that are pure functions of a fixed corpus:
 the triage rules, the topical guard, and the bibliography exporter. It opens no socket and
 calls no model, so it runs in about a second and its numbers move only when the code moves.
 
-It does **not** measure retrieval recall or screening accuracy, and it cannot. The labels
-in `fixtures/verdicts.jsonl` were produced by this pipeline's own screening pass, so
-scoring the pipeline against them is circular -- it can only ever agree with itself. What
-the labels *are* good for is the direction the triage rules must not drift: a work a
-screener read and included must not later be thrown away for free by a keyword rule.
+The screening labels in `fixtures/verdicts.jsonl` were produced by this pipeline's own
+screening pass, so scoring the pipeline against them would be circular. What they *are*
+good for is the direction the triage rules must not drift: a work a screener read and
+included must not later be thrown away for free by a keyword rule.
 
-Answering "did we find everything we should have?" needs a gold set -- papers a domain
-expert lists BEFORE seeing any run. That does not exist yet and is deliberately out of
-scope here; see README.md.
+`fixtures/gold_set.json` is different. Those 15 papers were listed by a domain expert for
+a beamsplitter review, without seeing any output of this pipeline, so recall against them
+is a measurement rather than self-agreement. It is measured here against the FROZEN
+corpus, which makes it a regression check -- the live number comes from running a search
+with `gold_set=` set on its SearchSpec.
+
+Screening accuracy still has no independent labels and is not measured.
 
 ## Why a frozen corpus rather than a live search
 
@@ -174,6 +177,15 @@ def measure() -> dict:
     metrics["bib_entries"] = len(loads(text).entries)
     metrics["bib_errors"] = sum(1 for f in findings if f.level == "error")
     metrics["bib_non_ascii"] = sorted({c for c in text if ord(c) > 127})
+
+    # --- gold-set recall, against the frozen corpus -----------------------------
+    from litsearch import report as reporting
+
+    gold = reporting.gold_recall(corpus, reporting.load_gold_set(FIXTURES / "gold_set.json"))
+    metrics["gold_total"] = gold["total"]
+    metrics["gold_found"] = gold["found"]
+    metrics["gold_recall_pct"] = gold["recall_pct"]
+    metrics["gold_missed"] = gold["missed"]
     return metrics
 
 

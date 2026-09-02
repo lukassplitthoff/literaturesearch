@@ -85,6 +85,7 @@ def write_run_log(
     rounds: list,
     verdicts: list[Verdict],
     known: list[dict],
+    gold: dict | None = None,
 ) -> None:
     """Everything needed to reproduce or audit the run."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,5 +100,50 @@ def write_run_log(
         "quarantined": sum(1 for v in verdicts if v.status != VERIFIED),
         "saturation_curve": [r.as_dict() for r in rounds],
         "known_items": known,
+        "gold_set": gold,
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+# ------------------------------------------------------------------ gold-set recall
+
+def load_gold_set(path) -> list[dict]:
+    """Read a gold set: papers a domain expert says must be found.
+
+    Distinct from ``known_items``, which are titles an earlier run produced and therefore
+    only guard against regression. A gold set is chosen by someone who has not seen the
+    output, so recall against it is a measurement rather than the system agreeing with
+    itself. Matched on DOI, which is exact -- no fuzzy title comparison to argue about.
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return data["papers"] if isinstance(data, dict) else list(data)
+
+
+def gold_recall(corpus, gold: list[dict]) -> dict:
+    """Which gold papers the corpus contains, and what happened to each."""
+    from litsearch.sources.base import clean_doi
+
+    by_doi = {work.doi: work for work in corpus.works if work.doi}
+    rows = []
+    for paper in gold:
+        doi = clean_doi(paper.get("doi"))
+        work = by_doi.get(doi)
+        rows.append({
+            "key": paper.get("key", doi),
+            "doi": doi,
+            "title": paper.get("title", ""),
+            "found": work is not None,
+            # A paper found but screened out is a different failure from one never found,
+            # and conflating them hides which half of the pipeline needs work.
+            "screen": (work.screen or "unscreened") if work else "",
+            "validation": (work.validation or "") if work else "",
+        })
+    found = sum(1 for r in rows if r["found"])
+    return {
+        "total": len(rows),
+        "found": found,
+        "recall_pct": round(100 * found / len(rows), 1) if rows else 0.0,
+        "missed": [r["key"] for r in rows if not r["found"]],
+        "found_but_screened_out": [r["key"] for r in rows if r["found"] and r["screen"] in ("exclude", "unsure")],
+        "rows": rows,
+    }

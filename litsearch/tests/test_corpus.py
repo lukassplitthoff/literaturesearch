@@ -224,3 +224,31 @@ def test_author_name_order_does_not_defeat_the_duplicate_merge():
     corpus.add(make(title=t, doi="10.1038/s41467-023-41104-0", year="2023", authors=["Yao Lu"]))
     corpus.add(make(title=t, doi="10.1038/s41467-023-41822-5", year="2023", authors=["Lu, Yao"]))
     assert len(corpus) == 1
+
+
+def test_an_explicit_seed_is_expanded_even_when_lightly_cited():
+    """A DOI-seeded search that never walks its own seed's graph is not doing the thing
+    it was asked to do. Seen live: an 82-citation seed lost its place to a 616-citation
+    review the queries dragged in, and three gold-set papers sitting in the seed's
+    reference list were never fetched."""
+    corpus = Corpus()
+    seed = make(title="The seed paper", doi="10.1/seed", cited_by_count=82)
+    seed.is_seed = True
+    corpus.add(seed)
+    corpus.add_all([make(title=f"Famous review {i}", doi=f"10.1/f{i}", cited_by_count=1000 + i)
+                    for i in range(10)])
+    chosen = corpus.seed_candidates(3)
+    assert chosen[0].title == "The seed paper", "the named seed must be expanded first"
+    assert len(chosen) == 3
+
+
+def test_an_expanded_seed_is_not_offered_twice():
+    corpus = Corpus()
+    seed = make(title="The seed paper", doi="10.1/seed", cited_by_count=5)
+    seed.is_seed = True
+    corpus.add(seed)
+    corpus.add(make(title="Another work", doi="10.1/b", cited_by_count=99))
+    first = corpus.seed_candidates(1)
+    assert first[0].title == "The seed paper"
+    second = corpus.seed_candidates(2, seen={id(w) for w in first})
+    assert [w.title for w in second] == ["Another work"]

@@ -61,6 +61,9 @@ class Work:
     references: list[str] = field(default_factory=list)
     # bookkeeping filled in later in the pipeline
     found_in_round: int = 0
+    # Named by the user as a seed DOI, rather than found by a query. Such a work is always
+    # expanded first: the whole point of naming it is that its neighbourhood is wanted.
+    is_seed: bool = False
     screen: str = ""
     screen_reason: str = ""
     validation: str = ""
@@ -96,6 +99,7 @@ class Work:
             "source_ids": self.source_ids,
             "references": self.references,
             "found_in_round": self.found_in_round,
+            "is_seed": self.is_seed,
             "screen": self.screen,
             "screen_reason": self.screen_reason,
             "validation": self.validation,

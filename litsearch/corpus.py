@@ -155,6 +155,14 @@ class Corpus:
         carries the ids already expanded, so no seed is paid for twice.
         """
         seen = seen or set()
+
+        # Works the user named by DOI come first, always, however lightly cited they are.
+        # Ranking them alongside query hits by citation count meant a seed with 82 citations
+        # lost its place to famous papers the queries dragged in -- so a DOI-seeded search
+        # never walked the graph of the very paper it was seeded with, which is the entire
+        # point of naming one.
+        explicit = [w for w in self.works if w.is_seed and id(w) not in seen]
+
         screened = self.screened_in() if prefer_screened else []
         if screened:
             # Best case: a screener has read these abstracts and judged them relevant.
@@ -170,7 +178,11 @@ class Corpus:
                 for work in self.works
                 if work.found_in_round in from_rounds and id(work) not in seen
             ]
-        return sorted(pool, key=lambda w: w.cited_by_count, reverse=True)[:count]
+        ranked = sorted(pool, key=lambda w: w.cited_by_count, reverse=True)
+        # Explicit seeds are prepended, not merged into the ranking, and de-duplicated
+        # against it so one cannot be counted twice.
+        explicit_ids = {id(w) for w in explicit}
+        return (explicit + [w for w in ranked if id(w) not in explicit_ids])[:count]
 
     def write_jsonl(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

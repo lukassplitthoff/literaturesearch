@@ -87,123 +87,123 @@
 {"index": 101, "t": "new material platform for", "verdict": "exclude", "reason": "transmon materials and coherence, no gate"}
 {"index": 102, "t": "superconducting cavity qubit with", "verdict": "exclude", "reason": "cavity coherence time measurement, no gate"}
 {"index": 104, "t": "superconducting microwave cavities and", "verdict": "exclude", "reason": "review of cavities and qubits, no new gate"}
-{"index": 105, "t": "error detected state transfer", "verdict": "include", "reason": "bus-mediated transfer and HOM interference between bosonic modes"}
-{"index": 106, "t": "simulating electronic structure on", "verdict": "unsure", "reason": "qumode VQE mapping; parametric gate implementation unclear"}
-{"index": 108, "t": "on demand transposition across", "verdict": "include", "reason": "on-demand switching of cavity-transmon interaction regime"}
-{"index": 109, "t": "controlled beam splitter gate", "verdict": "include", "reason": "controlled beam splitter gate on two bosonic modes"}
-{"index": 110, "t": "demonstrating efficient and robust", "verdict": "exclude", "reason": "state reconstruction technique, no gate"}
-{"index": 111, "t": "quantum systems under frequency", "verdict": "exclude", "reason": "review of frequency modulation, two-level focus, no gate"}
-{"index": 112, "t": "quantum sensing experiments with", "verdict": "exclude", "reason": "sensing experiments, no gate"}
-{"index": 113, "t": "leveraging hamiltonian simulation techniques", "verdict": "include", "reason": "compiles hybrid qubit-boson gates analytically"}
-{"index": 114, "t": "implementing and characterizing precise", "verdict": "exclude", "reason": "multiqubit measurement, no bosonic mode gate"}
-{"index": 116, "t": "crosstalk robust quantum control", "verdict": "include", "reason": "drive-engineered crosstalk-robust gates on multimode bosonic system"}
-{"index": 117, "t": "advancements in superconducting microwave", "verdict": "exclude", "reason": "review of cavities and qubits, no new gate"}
-{"index": 119, "t": "single shot quantum signal", "verdict": "unsure", "reason": "sensing framework; oscillator gate primitives not specified"}
-{"index": 120, "t": "inductively shunted transmons exhibit", "verdict": "exclude", "reason": "qubit design and coherence, no bosonic gate"}
-{"index": 121, "t": "recovering quantum coherence of", "verdict": "exclude", "reason": "real-time feedback on decoherence, no gate"}
-{"index": 123, "t": "fast universal control of", "verdict": "include", "reason": "drive-enhanced universal control of weakly coupled oscillator"}
-{"index": 124, "t": "optimizing pulse shapes of", "verdict": "include", "reason": "optimized echoed conditional displacement gate"}
-{"index": 125, "t": "symmetrically threaded superconducting quantum", "verdict": "include", "reason": "flux-pumped SQUID drive for Kerr-cat bosonic qubit"}
-{"index": 126, "t": "designing kerr interactions for", "verdict": "include", "reason": "engineering dynamic Kerr interactions in cavity circuits"}
-{"index": 127, "t": "a linear quantum coupler", "verdict": "include", "reason": "coupler for driven parametric processes on bosonic modes"}
-{"index": 128, "t": "coherent transfer via parametric", "verdict": "include", "reason": "parametric modulation gives coherent transfer between resonator modes"}
-{"index": 129, "t": "engineering the nonlinearity of", "verdict": "include", "reason": "flux-tuned SQUID engineering of bosonic mode nonlinearities"}
-{"index": 130, "t": "proposal for superconducting quantum", "verdict": "include", "reason": "parametric transduction between microwave modes via SQUID circuit"}
-{"index": 131, "t": "entanglement of bosonic modes", "verdict": "include", "reason": "engineered exchange interaction entangles two cavity modes"}
-{"index": 133, "t": "new directions in the", "verdict": "exclude", "reason": "Majorana review, not superconducting circuit gates"}
-{"index": 134, "t": "gate based superconducting quantum", "verdict": "exclude", "reason": "tutorial review, no new gate"}
-{"index": 136, "t": "universal qudit gate synthesis", "verdict": "exclude", "reason": "transmon qudit gates, no bosonic cavity mode"}
-{"index": 139, "t": "topological phases with parafermions", "verdict": "exclude", "reason": "parafermion topological review, out of scope"}
-{"index": 140, "t": "digital homodyne and heterodyne", "verdict": "exclude", "reason": "measurement scheme, no gate"}
-{"index": 141, "t": "bosonic quantum error correction", "verdict": "exclude", "reason": "review of bosonic QEC, no new gate"}
-{"index": 142, "t": "fast sideband control of", "verdict": "include", "reason": "sideband-driven transmon-cavity SWAP gates"}
-{"index": 145, "t": "superconducting qubit to optical", "verdict": "unsure", "reason": "no abstract; transduction may or may not report parametric gate"}
-{"index": 146, "t": "observation of two mode", "verdict": "unsure", "reason": "two-mode squeezing but amplifier context, no gate"}
-{"index": 148, "t": "symmetry and topology in", "verdict": "exclude", "reason": "non-Hermitian topology theory, out of scope"}
-{"index": 151, "t": "topological insulators and topological", "verdict": "exclude", "reason": "topological insulator textbook, out of scope"}
-{"index": 152, "t": "signatures of majorana fermions", "verdict": "exclude", "reason": "Majorana nanowire experiment, out of scope"}
-{"index": 153, "t": "observation of majorana fermions", "verdict": "exclude", "reason": "Majorana atomic chain experiment, out of scope"}
-{"index": 154, "t": "search for majorana fermions", "verdict": "exclude", "reason": "Majorana review, out of scope"}
-{"index": 155, "t": "anomalous zero bias conductance", "verdict": "exclude", "reason": "nanowire tunneling experiment, out of scope"}
-{"index": 156, "t": "majorana zero modes and", "verdict": "exclude", "reason": "Majorana topological computation review, out of scope"}
-{"index": 157, "t": "colloquium majorana fermions in", "verdict": "exclude", "reason": "Majorana colloquium, out of scope"}
-{"index": 158, "t": "scalable designs for quasiparticle", "verdict": "exclude", "reason": "Majorana architecture proposal, no bosonic gate"}
-{"index": 159, "t": "experimental detection of a", "verdict": "exclude", "reason": "Majorana vortex detection, out of scope"}
-{"index": 160, "t": "spin polarized supercurrents for", "verdict": "exclude", "reason": "superconducting spintronics review, out of scope"}
-{"index": 161, "t": "topological superconductivity and majorana", "verdict": "exclude", "reason": "RKKY topological superconductivity theory, out of scope"}
-{"index": 162, "t": "topological superconducting phase in", "verdict": "exclude", "reason": "Shiba chain theory, out of scope"}
-{"index": 163, "t": "majorana fermions in semiconductor", "verdict": "exclude", "reason": "Majorana nanowire review, out of scope"}
-{"index": 164, "t": "monolayer topological insulators silicene", "verdict": "exclude", "reason": "topological insulator materials theory, out of scope"}
-{"index": 165, "t": "andreev bound states versus", "verdict": "exclude", "reason": "Andreev versus Majorana bound states, out of scope"}
-{"index": 166, "t": "4π periodic josephson supercurrent", "verdict": "exclude", "reason": "topological Josephson junction experiment, out of scope"}
-{"index": 167, "t": "end states and subgap", "verdict": "exclude", "reason": "STM of adatom chains, out of scope"}
-{"index": 168, "t": "topological quantum computation based", "verdict": "exclude", "reason": "chiral Majorana computation theory, out of scope"}
-{"index": 169, "t": "toward tailoring majorana bound", "verdict": "exclude", "reason": "magnetic atom chain Majorana study, out of scope"}
-{"index": 170, "t": "instability of topological order", "verdict": "exclude", "reason": "HgTe topological order theory, out of scope"}
-{"index": 171, "t": "low energy subgap states", "verdict": "exclude", "reason": "p-wave wire subgap states theory, out of scope"}
-{"index": 172, "t": "kondo correlations and majorana", "verdict": "exclude", "reason": "Kondo-Majorana transport theory, out of scope"}
-{"index": 183, "t": "a quantum engineer s", "verdict": "exclude", "reason": "review of superconducting qubits, no new gate"}
-{"index": 184, "t": "high cooperativity in coupled", "verdict": "exclude", "reason": "static resonator-magnon coupling, no drive-activated gate"}
-{"index": 185, "t": "noise spectroscopy through dynamical", "verdict": "exclude", "reason": "flux qubit noise spectroscopy, no bosonic gate"}
-{"index": 186, "t": "the flux qubit revisited", "verdict": "exclude", "reason": "flux qubit design and coherence, no gate"}
-{"index": 187, "t": "colloquium stimulating uncertainty amplifying", "verdict": "exclude", "reason": "colloquium on vacuum amplification, no gate"}
-{"index": 188, "t": "stabilizing rabi oscillations in", "verdict": "exclude", "reason": "qubit feedback stabilization, no bosonic gate"}
-{"index": 189, "t": "high cooperativity coupling of", "verdict": "exclude", "reason": "spin ensemble coupling, no drive-activated gate"}
-{"index": 191, "t": "dissipation and ultrastrong coupling", "verdict": "exclude", "reason": "master-equation theory, no parametric gate"}
-{"index": 192, "t": "dynamical casimir effect in", "verdict": "include", "reason": "flux-modulated parametric photon-pair generation in microwave cavity"}
-{"index": 193, "t": "black box superconducting circuit", "verdict": "exclude", "reason": "circuit quantization method, no gate"}
-{"index": 194, "t": "evidence for the utility", "verdict": "exclude", "reason": "two-level qubit processor only, no bosonic mode"}
-{"index": 196, "t": "quantum vision transformers", "verdict": "exclude", "reason": "quantum machine learning, no bosonic gate"}
-{"index": 197, "t": "towards practical quantum computers", "verdict": "exclude", "reason": "qubit fabrication and coherence, no gate"}
-{"index": 199, "t": "millisecond coherence in a", "verdict": "exclude", "reason": "qubit coherence, no bosonic parametric interaction"}
-{"index": 200, "t": "impact of ionizing radiation", "verdict": "exclude", "reason": "qubit coherence study, no gate"}
-{"index": 201, "t": "laser annealing josephson junctions", "verdict": "exclude", "reason": "fabrication frequency targeting, no bosonic gate"}
-{"index": 202, "t": "tunable chiral bound states", "verdict": "exclude", "reason": "waveguide bound states, no drive-activated gate"}
-{"index": 203, "t": "the 2021 quantum materials", "verdict": "exclude", "reason": "materials roadmap review, no gate"}
-{"index": 204, "t": "suppression of crosstalk in", "verdict": "exclude", "reason": "dynamical decoupling on qubits only"}
-{"index": 205, "t": "implementation of conditional phase", "verdict": "exclude", "reason": "CZ gate between two-level qubits only"}
-{"index": 206, "t": "the qick quantum instrumentation", "verdict": "exclude", "reason": "control electronics, no gate physics"}
-{"index": 207, "t": "superconducting qubit in a", "verdict": "exclude", "reason": "coherence measurement, no parametric gate"}
-{"index": 208, "t": "realization of microwave quantum", "verdict": "exclude", "reason": "hybrid junction qubits, no bosonic parametric gate"}
-{"index": 209, "t": "semiconductor nanowire based superconducting", "verdict": "exclude", "reason": "gatemon qubit demonstration, no parametric gate"}
-{"index": 210, "t": "characterizing errors on qubit", "verdict": "exclude", "reason": "randomized benchmarking of qubit gates"}
-{"index": 211, "t": "a near quantum limited", "verdict": "exclude", "reason": "parametric amplifier, no gate"}
-{"index": 212, "t": "thermal and residual excited", "verdict": "exclude", "reason": "qubit thermal population, no gate"}
-{"index": 217, "t": "quantum simulation", "verdict": "exclude", "reason": "review of quantum simulation, no new gate"}
-{"index": 218, "t": "hybrid quantum circuits superconducting", "verdict": "exclude", "reason": "hybrid systems review, no new gate"}
-{"index": 219, "t": "1 f noise implications", "verdict": "exclude", "reason": "noise review, no parametric gate"}
-{"index": 220, "t": "10 qubit entanglement and", "verdict": "unsure", "reason": "bus-resonator-mediated qubit gates; drive activation unstated"}
-{"index": 221, "t": "leggett garg inequalities", "verdict": "exclude", "reason": "foundations review, no gate"}
-{"index": 222, "t": "decoherence free interaction between", "verdict": "exclude", "reason": "giant-atom waveguide coupling, no parametric gate"}
-{"index": 224, "t": "optimal charging of a", "verdict": "exclude", "reason": "qutrit quantum battery, no bosonic gate"}
-{"index": 226, "t": "perfect quantum state transfer", "verdict": "exclude", "reason": "parametric coupling between two-level qubits only"}
-{"index": 227, "t": "spontaneous conversion from virtual", "verdict": "exclude", "reason": "ultrastrong coupling, explicitly no external drive"}
-{"index": 228, "t": "single loop realization of", "verdict": "include", "reason": "drive-activated holonomic gates on a microwave cavity"}
-{"index": 229, "t": "from blockade to transparency", "verdict": "exclude", "reason": "photon blockade transmission, no gate"}
-{"index": 230, "t": "quantum nondemolition measurement of", "verdict": "exclude", "reason": "qubit readout, no gate"}
-{"index": 231, "t": "vacuum degeneracy of a", "verdict": "exclude", "reason": "ultrastrong-coupling vacuum physics, no gate"}
-{"index": 232, "t": "ultrastrong coupling regimes of", "verdict": "exclude", "reason": "review of ultrastrong coupling, no gate"}
-{"index": 233, "t": "fluctuations of energy relaxation", "verdict": "exclude", "reason": "qubit relaxation fluctuations, no gate"}
-{"index": 234, "t": "decoherence benchmarking of superconducting", "verdict": "exclude", "reason": "coherence benchmarking, no parametric gate"}
-{"index": 235, "t": "stable adiabatic quantum batteries", "verdict": "exclude", "reason": "quantum battery protocol, no bosonic gate"}
-{"index": 236, "t": "quantum electrodynamics in a", "verdict": "exclude", "reason": "topological waveguide QED, no drive-activated gate"}
-{"index": 237, "t": "josephson diode effect in", "verdict": "exclude", "reason": "supercurrent nonreciprocity, no gate"}
-{"index": 238, "t": "breakdown of gauge invariance", "verdict": "exclude", "reason": "gauge-invariance theory, no gate"}
-{"index": 239, "t": "engineering the level structure", "verdict": "exclude", "reason": "giant-atom level engineering, no parametric gate"}
-{"index": 240, "t": "quantum generative adversarial learning", "verdict": "exclude", "reason": "machine learning on qubits, no bosonic gate"}
-{"index": 241, "t": "two photon quantum rabi", "verdict": "unsure", "reason": "engineered two-photon qubit-resonator coupling; drive activation unclear"}
-{"index": 242, "t": "circuit quantum electrodynamics of", "verdict": "exclude", "reason": "static Kerr nonlinearity of resonators, no drive"}
-{"index": 243, "t": "subradiant states of quantum", "verdict": "exclude", "reason": "waveguide collective emission, no gate"}
-{"index": 245, "t": "scalable two and four", "verdict": "exclude", "reason": "parity readout via dispersive coupling, no gate"}
-{"index": 246, "t": "quantum optics with propagating", "verdict": "exclude", "reason": "propagating-microwave scattering review, no gate"}
-{"index": 249, "t": "experimental searches for the", "verdict": "exclude", "reason": "axion detection review, no gate"}
-{"index": 253, "t": "ultrafast charging in a", "verdict": "exclude", "reason": "Dicke quantum battery charging, no parametric gate"}
-{"index": 254, "t": "leakage reduction in fast", "verdict": "exclude", "reason": "single-qubit pulse optimization, no bosonic mode"}
-{"index": 256, "t": "electric field spectroscopy of", "verdict": "exclude", "reason": "material defect spectroscopy, no gate"}
-{"index": 257, "t": "observation of a dynamical", "verdict": "exclude", "reason": "single-qubit simulation of phase transition, no gate"}
-{"index": 258, "t": "systematic improvements in transmon", "verdict": "exclude", "reason": "surface encapsulation for coherence, no gate"}
-{"index": 259, "t": "reaching the quantum limit", "verdict": "exclude", "reason": "spin resonance sensing with amplifier, no gate"}
-{"index": 260, "t": "high fidelity single shot", "verdict": "exclude", "reason": "Toffoli gate between two-level qubits only"}
-{"index": 261, "t": "optimized driving of superconducting", "verdict": "exclude", "reason": "single-qubit DRAG pulses, no bosonic mode"}
-{"index": 262, "t": "ultralow power spectroscopy of", "verdict": "exclude", "reason": "spin ensemble spectroscopy, no gate"}
-{"index": 264, "t": "quantum simulation with interacting", "verdict": "exclude", "reason": "photon simulation review, no drive-activated gate"}
+{"index": 106, "t": "error detected state transfer", "verdict": "include", "reason": "bus-mediated transfer and HOM interference between bosonic modes"}
+{"index": 107, "t": "simulating electronic structure on", "verdict": "unsure", "reason": "qumode VQE mapping; parametric gate implementation unclear"}
+{"index": 109, "t": "on demand transposition across", "verdict": "include", "reason": "on-demand switching of cavity-transmon interaction regime"}
+{"index": 110, "t": "controlled beam splitter gate", "verdict": "include", "reason": "controlled beam splitter gate on two bosonic modes"}
+{"index": 111, "t": "demonstrating efficient and robust", "verdict": "exclude", "reason": "state reconstruction technique, no gate"}
+{"index": 112, "t": "quantum systems under frequency", "verdict": "exclude", "reason": "review of frequency modulation, two-level focus, no gate"}
+{"index": 113, "t": "quantum sensing experiments with", "verdict": "exclude", "reason": "sensing experiments, no gate"}
+{"index": 114, "t": "leveraging hamiltonian simulation techniques", "verdict": "include", "reason": "compiles hybrid qubit-boson gates analytically"}
+{"index": 115, "t": "implementing and characterizing precise", "verdict": "exclude", "reason": "multiqubit measurement, no bosonic mode gate"}
+{"index": 117, "t": "crosstalk robust quantum control", "verdict": "include", "reason": "drive-engineered crosstalk-robust gates on multimode bosonic system"}
+{"index": 118, "t": "advancements in superconducting microwave", "verdict": "exclude", "reason": "review of cavities and qubits, no new gate"}
+{"index": 120, "t": "single shot quantum signal", "verdict": "unsure", "reason": "sensing framework; oscillator gate primitives not specified"}
+{"index": 121, "t": "inductively shunted transmons exhibit", "verdict": "exclude", "reason": "qubit design and coherence, no bosonic gate"}
+{"index": 122, "t": "recovering quantum coherence of", "verdict": "exclude", "reason": "real-time feedback on decoherence, no gate"}
+{"index": 124, "t": "fast universal control of", "verdict": "include", "reason": "drive-enhanced universal control of weakly coupled oscillator"}
+{"index": 125, "t": "optimizing pulse shapes of", "verdict": "include", "reason": "optimized echoed conditional displacement gate"}
+{"index": 126, "t": "symmetrically threaded superconducting quantum", "verdict": "include", "reason": "flux-pumped SQUID drive for Kerr-cat bosonic qubit"}
+{"index": 127, "t": "designing kerr interactions for", "verdict": "include", "reason": "engineering dynamic Kerr interactions in cavity circuits"}
+{"index": 128, "t": "a linear quantum coupler", "verdict": "include", "reason": "coupler for driven parametric processes on bosonic modes"}
+{"index": 129, "t": "coherent transfer via parametric", "verdict": "include", "reason": "parametric modulation gives coherent transfer between resonator modes"}
+{"index": 130, "t": "engineering the nonlinearity of", "verdict": "include", "reason": "flux-tuned SQUID engineering of bosonic mode nonlinearities"}
+{"index": 131, "t": "proposal for superconducting quantum", "verdict": "include", "reason": "parametric transduction between microwave modes via SQUID circuit"}
+{"index": 133, "t": "entanglement of bosonic modes", "verdict": "include", "reason": "engineered exchange interaction entangles two cavity modes"}
+{"index": 135, "t": "new directions in the", "verdict": "exclude", "reason": "Majorana review, not superconducting circuit gates"}
+{"index": 136, "t": "gate based superconducting quantum", "verdict": "exclude", "reason": "tutorial review, no new gate"}
+{"index": 138, "t": "universal qudit gate synthesis", "verdict": "exclude", "reason": "transmon qudit gates, no bosonic cavity mode"}
+{"index": 141, "t": "topological phases with parafermions", "verdict": "exclude", "reason": "parafermion topological review, out of scope"}
+{"index": 142, "t": "digital homodyne and heterodyne", "verdict": "exclude", "reason": "measurement scheme, no gate"}
+{"index": 143, "t": "bosonic quantum error correction", "verdict": "exclude", "reason": "review of bosonic QEC, no new gate"}
+{"index": 144, "t": "fast sideband control of", "verdict": "include", "reason": "sideband-driven transmon-cavity SWAP gates"}
+{"index": 147, "t": "superconducting qubit to optical", "verdict": "unsure", "reason": "no abstract; transduction may or may not report parametric gate"}
+{"index": 148, "t": "observation of two mode", "verdict": "unsure", "reason": "two-mode squeezing but amplifier context, no gate"}
+{"index": 150, "t": "symmetry and topology in", "verdict": "exclude", "reason": "non-Hermitian topology theory, out of scope"}
+{"index": 153, "t": "topological insulators and topological", "verdict": "exclude", "reason": "topological insulator textbook, out of scope"}
+{"index": 154, "t": "signatures of majorana fermions", "verdict": "exclude", "reason": "Majorana nanowire experiment, out of scope"}
+{"index": 155, "t": "observation of majorana fermions", "verdict": "exclude", "reason": "Majorana atomic chain experiment, out of scope"}
+{"index": 156, "t": "search for majorana fermions", "verdict": "exclude", "reason": "Majorana review, out of scope"}
+{"index": 157, "t": "anomalous zero bias conductance", "verdict": "exclude", "reason": "nanowire tunneling experiment, out of scope"}
+{"index": 158, "t": "majorana zero modes and", "verdict": "exclude", "reason": "Majorana topological computation review, out of scope"}
+{"index": 159, "t": "colloquium majorana fermions in", "verdict": "exclude", "reason": "Majorana colloquium, out of scope"}
+{"index": 160, "t": "scalable designs for quasiparticle", "verdict": "exclude", "reason": "Majorana architecture proposal, no bosonic gate"}
+{"index": 161, "t": "experimental detection of a", "verdict": "exclude", "reason": "Majorana vortex detection, out of scope"}
+{"index": 162, "t": "spin polarized supercurrents for", "verdict": "exclude", "reason": "superconducting spintronics review, out of scope"}
+{"index": 163, "t": "topological superconductivity and majorana", "verdict": "exclude", "reason": "RKKY topological superconductivity theory, out of scope"}
+{"index": 164, "t": "topological superconducting phase in", "verdict": "exclude", "reason": "Shiba chain theory, out of scope"}
+{"index": 165, "t": "majorana fermions in semiconductor", "verdict": "exclude", "reason": "Majorana nanowire review, out of scope"}
+{"index": 166, "t": "monolayer topological insulators silicene", "verdict": "exclude", "reason": "topological insulator materials theory, out of scope"}
+{"index": 167, "t": "andreev bound states versus", "verdict": "exclude", "reason": "Andreev versus Majorana bound states, out of scope"}
+{"index": 168, "t": "4π periodic josephson supercurrent", "verdict": "exclude", "reason": "topological Josephson junction experiment, out of scope"}
+{"index": 169, "t": "end states and subgap", "verdict": "exclude", "reason": "STM of adatom chains, out of scope"}
+{"index": 170, "t": "topological quantum computation based", "verdict": "exclude", "reason": "chiral Majorana computation theory, out of scope"}
+{"index": 171, "t": "toward tailoring majorana bound", "verdict": "exclude", "reason": "magnetic atom chain Majorana study, out of scope"}
+{"index": 172, "t": "instability of topological order", "verdict": "exclude", "reason": "HgTe topological order theory, out of scope"}
+{"index": 173, "t": "low energy subgap states", "verdict": "exclude", "reason": "p-wave wire subgap states theory, out of scope"}
+{"index": 174, "t": "kondo correlations and majorana", "verdict": "exclude", "reason": "Kondo-Majorana transport theory, out of scope"}
+{"index": 185, "t": "a quantum engineer s", "verdict": "exclude", "reason": "review of superconducting qubits, no new gate"}
+{"index": 186, "t": "high cooperativity in coupled", "verdict": "exclude", "reason": "static resonator-magnon coupling, no drive-activated gate"}
+{"index": 187, "t": "noise spectroscopy through dynamical", "verdict": "exclude", "reason": "flux qubit noise spectroscopy, no bosonic gate"}
+{"index": 188, "t": "the flux qubit revisited", "verdict": "exclude", "reason": "flux qubit design and coherence, no gate"}
+{"index": 189, "t": "colloquium stimulating uncertainty amplifying", "verdict": "exclude", "reason": "colloquium on vacuum amplification, no gate"}
+{"index": 190, "t": "stabilizing rabi oscillations in", "verdict": "exclude", "reason": "qubit feedback stabilization, no bosonic gate"}
+{"index": 191, "t": "high cooperativity coupling of", "verdict": "exclude", "reason": "spin ensemble coupling, no drive-activated gate"}
+{"index": 193, "t": "dissipation and ultrastrong coupling", "verdict": "exclude", "reason": "master-equation theory, no parametric gate"}
+{"index": 194, "t": "dynamical casimir effect in", "verdict": "include", "reason": "flux-modulated parametric photon-pair generation in microwave cavity"}
+{"index": 195, "t": "black box superconducting circuit", "verdict": "exclude", "reason": "circuit quantization method, no gate"}
+{"index": 196, "t": "evidence for the utility", "verdict": "exclude", "reason": "two-level qubit processor only, no bosonic mode"}
+{"index": 198, "t": "quantum vision transformers", "verdict": "exclude", "reason": "quantum machine learning, no bosonic gate"}
+{"index": 199, "t": "towards practical quantum computers", "verdict": "exclude", "reason": "qubit fabrication and coherence, no gate"}
+{"index": 201, "t": "millisecond coherence in a", "verdict": "exclude", "reason": "qubit coherence, no bosonic parametric interaction"}
+{"index": 202, "t": "impact of ionizing radiation", "verdict": "exclude", "reason": "qubit coherence study, no gate"}
+{"index": 203, "t": "laser annealing josephson junctions", "verdict": "exclude", "reason": "fabrication frequency targeting, no bosonic gate"}
+{"index": 204, "t": "tunable chiral bound states", "verdict": "exclude", "reason": "waveguide bound states, no drive-activated gate"}
+{"index": 205, "t": "the 2021 quantum materials", "verdict": "exclude", "reason": "materials roadmap review, no gate"}
+{"index": 206, "t": "suppression of crosstalk in", "verdict": "exclude", "reason": "dynamical decoupling on qubits only"}
+{"index": 207, "t": "implementation of conditional phase", "verdict": "exclude", "reason": "CZ gate between two-level qubits only"}
+{"index": 208, "t": "the qick quantum instrumentation", "verdict": "exclude", "reason": "control electronics, no gate physics"}
+{"index": 209, "t": "superconducting qubit in a", "verdict": "exclude", "reason": "coherence measurement, no parametric gate"}
+{"index": 210, "t": "realization of microwave quantum", "verdict": "exclude", "reason": "hybrid junction qubits, no bosonic parametric gate"}
+{"index": 211, "t": "semiconductor nanowire based superconducting", "verdict": "exclude", "reason": "gatemon qubit demonstration, no parametric gate"}
+{"index": 212, "t": "characterizing errors on qubit", "verdict": "exclude", "reason": "randomized benchmarking of qubit gates"}
+{"index": 213, "t": "a near quantum limited", "verdict": "exclude", "reason": "parametric amplifier, no gate"}
+{"index": 214, "t": "thermal and residual excited", "verdict": "exclude", "reason": "qubit thermal population, no gate"}
+{"index": 219, "t": "quantum simulation", "verdict": "exclude", "reason": "review of quantum simulation, no new gate"}
+{"index": 220, "t": "hybrid quantum circuits superconducting", "verdict": "exclude", "reason": "hybrid systems review, no new gate"}
+{"index": 221, "t": "1 f noise implications", "verdict": "exclude", "reason": "noise review, no parametric gate"}
+{"index": 222, "t": "10 qubit entanglement and", "verdict": "unsure", "reason": "bus-resonator-mediated qubit gates; drive activation unstated"}
+{"index": 223, "t": "leggett garg inequalities", "verdict": "exclude", "reason": "foundations review, no gate"}
+{"index": 224, "t": "decoherence free interaction between", "verdict": "exclude", "reason": "giant-atom waveguide coupling, no parametric gate"}
+{"index": 226, "t": "optimal charging of a", "verdict": "exclude", "reason": "qutrit quantum battery, no bosonic gate"}
+{"index": 228, "t": "perfect quantum state transfer", "verdict": "exclude", "reason": "parametric coupling between two-level qubits only"}
+{"index": 229, "t": "spontaneous conversion from virtual", "verdict": "exclude", "reason": "ultrastrong coupling, explicitly no external drive"}
+{"index": 230, "t": "single loop realization of", "verdict": "include", "reason": "drive-activated holonomic gates on a microwave cavity"}
+{"index": 231, "t": "from blockade to transparency", "verdict": "exclude", "reason": "photon blockade transmission, no gate"}
+{"index": 232, "t": "quantum nondemolition measurement of", "verdict": "exclude", "reason": "qubit readout, no gate"}
+{"index": 233, "t": "vacuum degeneracy of a", "verdict": "exclude", "reason": "ultrastrong-coupling vacuum physics, no gate"}
+{"index": 234, "t": "ultrastrong coupling regimes of", "verdict": "exclude", "reason": "review of ultrastrong coupling, no gate"}
+{"index": 235, "t": "fluctuations of energy relaxation", "verdict": "exclude", "reason": "qubit relaxation fluctuations, no gate"}
+{"index": 236, "t": "decoherence benchmarking of superconducting", "verdict": "exclude", "reason": "coherence benchmarking, no parametric gate"}
+{"index": 237, "t": "stable adiabatic quantum batteries", "verdict": "exclude", "reason": "quantum battery protocol, no bosonic gate"}
+{"index": 238, "t": "quantum electrodynamics in a", "verdict": "exclude", "reason": "topological waveguide QED, no drive-activated gate"}
+{"index": 239, "t": "josephson diode effect in", "verdict": "exclude", "reason": "supercurrent nonreciprocity, no gate"}
+{"index": 240, "t": "breakdown of gauge invariance", "verdict": "exclude", "reason": "gauge-invariance theory, no gate"}
+{"index": 241, "t": "engineering the level structure", "verdict": "exclude", "reason": "giant-atom level engineering, no parametric gate"}
+{"index": 242, "t": "quantum generative adversarial learning", "verdict": "exclude", "reason": "machine learning on qubits, no bosonic gate"}
+{"index": 243, "t": "two photon quantum rabi", "verdict": "unsure", "reason": "engineered two-photon qubit-resonator coupling; drive activation unclear"}
+{"index": 244, "t": "circuit quantum electrodynamics of", "verdict": "exclude", "reason": "static Kerr nonlinearity of resonators, no drive"}
+{"index": 245, "t": "subradiant states of quantum", "verdict": "exclude", "reason": "waveguide collective emission, no gate"}
+{"index": 247, "t": "scalable two and four", "verdict": "exclude", "reason": "parity readout via dispersive coupling, no gate"}
+{"index": 248, "t": "quantum optics with propagating", "verdict": "exclude", "reason": "propagating-microwave scattering review, no gate"}
+{"index": 251, "t": "experimental searches for the", "verdict": "exclude", "reason": "axion detection review, no gate"}
+{"index": 255, "t": "ultrafast charging in a", "verdict": "exclude", "reason": "Dicke quantum battery charging, no parametric gate"}
+{"index": 256, "t": "leakage reduction in fast", "verdict": "exclude", "reason": "single-qubit pulse optimization, no bosonic mode"}
+{"index": 258, "t": "electric field spectroscopy of", "verdict": "exclude", "reason": "material defect spectroscopy, no gate"}
+{"index": 259, "t": "observation of a dynamical", "verdict": "exclude", "reason": "single-qubit simulation of phase transition, no gate"}
+{"index": 260, "t": "systematic improvements in transmon", "verdict": "exclude", "reason": "surface encapsulation for coherence, no gate"}
+{"index": 261, "t": "reaching the quantum limit", "verdict": "exclude", "reason": "spin resonance sensing with amplifier, no gate"}
+{"index": 262, "t": "high fidelity single shot", "verdict": "exclude", "reason": "Toffoli gate between two-level qubits only"}
+{"index": 263, "t": "optimized driving of superconducting", "verdict": "exclude", "reason": "single-qubit DRAG pulses, no bosonic mode"}
+{"index": 264, "t": "ultralow power spectroscopy of", "verdict": "exclude", "reason": "spin ensemble spectroscopy, no gate"}
+{"index": 266, "t": "quantum simulation with interacting", "verdict": "exclude", "reason": "photon simulation review, no drive-activated gate"}

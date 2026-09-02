@@ -80,6 +80,7 @@ def from_seed_dois(fetcher: Fetcher, dois: tuple[str, ...]) -> list:
             print(f"  [WARN] seed DOI {clean} did not resolve in OpenAlex; skipped")
             continue
         work = openalex.to_work(results[0])
+        work.is_seed = True
         works.append(work)
         print(f"  seed: {work.title[:66]} ({work.cited_by_count} citations, {len(work.references)} refs)")
     return works

@@ -56,3 +56,24 @@ def test_the_benchmark_detects_an_over_tightened_rule(monkeypatch):
     assert len(metrics["includes_lost_to_triage"]) > 10
     baseline = json.loads(benchmark.BASELINE.read_text(encoding="utf-8"))
     assert benchmark.compare(metrics, baseline), "an over-tightened rule must be reported"
+
+
+def test_gold_recall_is_measured_and_reported():
+    """The gold set was chosen by a domain expert without seeing this pipeline's output,
+    which is what separates a measurement from the system agreeing with itself."""
+    metrics = benchmark.measure()
+    assert metrics["gold_total"] == 15
+    assert 0 <= metrics["gold_recall_pct"] <= 100
+    # Every gold paper is either found or named in the miss list -- no silent loss.
+    assert metrics["gold_found"] + len(metrics["gold_missed"]) == metrics["gold_total"]
+
+
+def test_the_fixture_retains_every_gold_paper_the_corpus_had():
+    """The fixture is a sample of a larger corpus. If sampling drops gold papers, the
+    recall number becomes an artifact of fixture construction rather than of retrieval --
+    which it briefly was, reporting 53% against a real 67%."""
+    metrics = benchmark.measure()
+    assert metrics["gold_found"] == 10, (
+        "the frozen corpus contained 10 of the 15 gold papers; a different number means "
+        "the fixture was rebuilt without preserving them"
+    )

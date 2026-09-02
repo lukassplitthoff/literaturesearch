@@ -18,7 +18,11 @@ See README.md in this directory for what a completed run produced.
 
 from __future__ import annotations
 
+import pathlib
+
 from litsearch.pipeline import SearchSpec, run
+
+HERE = pathlib.Path(__file__).resolve().parent
 
 SPEC = SearchSpec(
     name="parametric_gates_bosonic_cavities",
@@ -35,12 +39,21 @@ SPEC = SearchSpec(
         "echoed conditional displacement gate bosonic qubit",
         "SNAIL ATS parametric coupler three-wave mixing cavity",
         "controlled-SWAP exponential-SWAP bosonic mode gate",
+        # Added after a gold-set check: the JRM and remote-state-transfer literature
+        # neither cites nor is cited by the seed, so the citation graph cannot reach it
+        # and only its own vocabulary will.
+        "Josephson ring modulator parametric frequency conversion microwave",
+        "on-demand quantum state transfer remote microwave cavity memories",
     ],
     year_from=2010,
     sources=("openalex", "inspire"),  # semanticscholar throttles keyless clients to nothing
     max_rounds=2,
     seeds_per_round=10,
-    refs_per_seed=12,  # the seed's reference list is the point of the exercise
+    # The seed has 71 references and 85 citers. An earlier run took only 12 refs per seed
+    # and lost three gold-set papers that were sitting in that list -- by far the largest
+    # single recall loss found. Expansion is throttled to 1 req/s, so this costs roughly
+    # seeds_per_round * (1 + refs_per_seed) seconds per round.
+    refs_per_seed=40,
     # Found by an earlier run of this search, validated against Crossref and screened in --
     # NOT supplied from memory. That makes this a regression check against a change that
     # breaks retrieval, not an independent test of recall, which would need titles chosen
@@ -52,6 +65,9 @@ SPEC = SearchSpec(
         "Efficient cavity control with SNAP gates",
         "Stabilization and operation of a Kerr-cat qubit",
     ],
+    # Papers a domain expert listed for a beamsplitter review, WITHOUT seeing any output
+    # of this pipeline. Recall against them is a measurement, not self-agreement.
+    gold_set=str(HERE / "gold_set.json"),
     inclusion_criteria=(
         "Reports a parametric gate or parametric interaction between bosonic modes -- a "
         "microwave cavity, resonator or bosonic-encoded qubit. Beam splitter, two-mode "
