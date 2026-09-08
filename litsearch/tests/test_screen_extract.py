@@ -75,8 +75,17 @@ def test_missing_verdicts_file_is_not_an_error(tmp_path):
 def test_unscreened_works_are_counted_and_never_included():
     corpus = corpus_of(3)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "yes"}})
-    assert counts == {"include": 1, "exclude": 0, "unsure": 0, "unscreened": 2, "by_rule": 0,
-                      "misaligned": 0, "unverified": 1, "realigned": 0}, "a verdict with no checksum is counted"
+    assert counts == {
+        "include": 1,
+        "exclude": 0,
+        "unsure": 0,
+        "unscreened": 2,
+        "by_rule": 0,
+        "misaligned": 0,
+        "unverified": 1,
+        "realigned": 0,
+        "roled": 0,
+    }, "a verdict with no checksum is counted"
     assert [w.title for w in screen.included(corpus)] == ["Paper number 0"]
     assert len(screen.needs_review(corpus)) == 2, "unscreened work must surface for review"
 
@@ -283,9 +292,7 @@ def test_a_verdict_without_an_echo_still_applies():
 
 
 def test_batches_carry_the_title_for_the_checksum(tmp_path):
-    payload = json.loads(
-        screen.prepare_batches(corpus_of(2), "a", "b", tmp_path)[0].read_text(encoding="utf-8")
-    )
+    payload = json.loads(screen.prepare_batches(corpus_of(2), "a", "b", tmp_path)[0].read_text(encoding="utf-8"))
     assert payload["works"][0]["t"] == "Paper number 0"
     assert "checksum" in payload["instructions"]
 
@@ -312,17 +319,16 @@ def test_the_checksum_is_precomputed_in_the_batch(tmp_path):
     assert payload["works"][1]["c"] == "quantum simulation", "a short title must still yield a checksum"
 
     # And the value it ships is exactly what apply_verdicts will accept.
-    counts = screen.apply_verdicts(
-        corpus, {1: {"verdict": "include", "reason": "x", "t": payload["works"][1]["c"]}}
-    )
+    counts = screen.apply_verdicts(corpus, {1: {"verdict": "include", "reason": "x", "t": payload["works"][1]["c"]}})
     assert counts["misaligned"] == 0 and len(screen.included(corpus)) == 1
 
 
 def test_task_offers_the_arxiv_pdf_as_well(tmp_path):
     """Every publisher PDF url failed on the first real extraction run: APS 403, Nature
     redirected into auth. The arXiv preprint of the same paper was open."""
-    work = Work(title="A paper", doi="10.1103/x", arxiv_id="2303.00959",
-                oa_pdf_url="http://link.aps.org/pdf/10.1103/x")
+    work = Work(
+        title="A paper", doi="10.1103/x", arxiv_id="2303.00959", oa_pdf_url="http://link.aps.org/pdf/10.1103/x"
+    )
     payload = json.loads(extract.prepare_tasks([work], tmp_path)[0].read_text(encoding="utf-8"))
     assert payload["arxiv_pdf_url"] == "https://arxiv.org/pdf/2303.00959"
     assert payload["pdf_url"].startswith("http://link.aps.org")
@@ -346,9 +352,15 @@ def test_a_work_with_neither_is_marked_unreachable(tmp_path):
 def test_descriptive_fields_are_not_digit_checked():
     """'two 3D cavities' contains a digit incidentally; demanding the quote repeat it
     produced a stream of false alarms on the first real extraction run."""
-    rows = [{"cite_key": "X", "modes": "two 3D cavities", "platform": "superconducting, 3D cavity",
-             "gate_type": "beam splitter",
-             "source_quote": "A SNAIL-based coupler exchanges photons between two cavity modes."}]
+    rows = [
+        {
+            "cite_key": "X",
+            "modes": "two 3D cavities",
+            "platform": "superconducting, 3D cavity",
+            "gate_type": "beam splitter",
+            "source_quote": "A SNAIL-based coupler exchanges photons between two cavity modes.",
+        }
+    ]
     _, complaints = extract.validate_rows(rows, schema=("modes", "platform", "gate_type"))
     assert complaints == [], f"descriptive text must not be digit-checked: {complaints}"
 
@@ -362,8 +374,7 @@ def test_numeric_fields_are_still_checked():
 def test_is_numeric_distinguishes_measurements_from_prose():
     for value in (125, 99.92, "125", "99.92", " 1.3 ", "95.5%", "2e3"):
         assert extract.is_numeric(value), f"should be numeric: {value!r}"
-    for value in ("two 3D cavities", "superconducting, 3D cavity", "beam splitter",
-                  "three-wave", "", None):
+    for value in ("two 3D cavities", "superconducting, 3D cavity", "beam splitter", "three-wave", "", None):
         assert not extract.is_numeric(value), f"should not be numeric: {value!r}"
 
 
@@ -386,9 +397,7 @@ def test_a_verdict_without_a_checksum_is_counted_as_unverified():
 
 def test_a_checksummed_verdict_is_not_counted_as_unverified():
     corpus = corpus_of(2)
-    counts = screen.apply_verdicts(
-        corpus, {0: {"verdict": "include", "reason": "x", "t": "paper number 0"}}
-    )
+    counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "x", "t": "paper number 0"}})
     assert counts["unverified"] == 0
 
 
@@ -422,9 +431,7 @@ def test_an_ambiguous_checksum_is_refused_not_guessed():
 def test_a_relocated_verdict_is_not_also_counted_as_misaligned():
     """The stale entry must be dropped, not left pointing at the wrong work."""
     corpus = corpus_of(3)
-    counts = screen.apply_verdicts(
-        corpus, {0: {"verdict": "include", "reason": "x", "t": "Paper number 2"}}
-    )
+    counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "x", "t": "Paper number 2"}})
     assert counts["realigned"] == 1
     assert counts["misaligned"] == 0, "one verdict must not be counted twice"
     assert counts["unscreened"] == 2, "papers 0 and 1 are simply unscreened"
@@ -439,8 +446,10 @@ def test_gold_recall_matches_on_doi_not_title():
 
     corpus = Corpus()
     corpus.add(Work(title="A completely different title", doi="10.1/found"))
-    gold = [{"key": "a", "doi": "https://doi.org/10.1/FOUND", "title": "Whatever"},
-            {"key": "b", "doi": "10.1/absent", "title": "Missing paper"}]
+    gold = [
+        {"key": "a", "doi": "https://doi.org/10.1/FOUND", "title": "Whatever"},
+        {"key": "b", "doi": "10.1/absent", "title": "Missing paper"},
+    ]
     result = report.gold_recall(corpus, gold)
     assert result["found"] == 1 and result["missed"] == ["b"]
     assert result["recall_pct"] == 50.0

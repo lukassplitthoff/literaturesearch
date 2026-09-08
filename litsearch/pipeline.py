@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from bibcheck.verify import IndexClient
-from litsearch import export, extract, relevance, report, retrieve, screen, snowball
+from litsearch import conflict, export, extract, plan, relevance, report, retrieve, screen, snowball
 from litsearch.config import OUT_DIR_ENV, SearchConfig, run_dir, warn_if_inside_repo
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
@@ -72,6 +72,11 @@ class SearchSpec:
     # see relevance.triage.
     screen_forbidden: tuple[str, ...] = ()
     screen_required: tuple[str, ...] = ()
+
+    # Stage 4, second output. What KIND of paper each one is, decided in the same pass
+    # as relevance because it is nearly free there. Override to suit the field -- a
+    # clinical search wants "rct" and "cohort" where a physics one wants "primary".
+    roles: tuple[str, ...] = screen.ROLES
 
     # Stage 6 columns. Each must be quotable from the paper or it is recorded null.
     extraction_schema: tuple[str, ...] = ()
@@ -135,37 +140,51 @@ def run(spec: SearchSpec) -> int:
     gold_result = None
     if spec.gold_set:
         gold_result = report.gold_recall(corpus, report.load_gold_set(spec.gold_set))
-        print(f"  gold set: {gold_result['found']}/{gold_result['total']} found "
-              f"({gold_result['recall_pct']}% recall)")
+        print(
+            f"  gold set: {gold_result['found']}/{gold_result['total']} found "
+            f"({gold_result['recall_pct']}% recall)"
+        )
         for row in gold_result["rows"]:
             mark = "OK  " if row["found"] else "MISS"
             print(f"    [{mark}] {row['key']:30s} {row['screen']}")
 
     print("\n[5/7] screen")
     screen_dir = cfg.out_dir / "screen"
-    to_model, rule_excluded = relevance.triage_all(
-        corpus.works, spec.screen_required, spec.screen_forbidden
-    )
+    to_model, rule_excluded = relevance.triage_all(corpus.works, spec.screen_required, spec.screen_forbidden)
     print(f"  triage: {len(rule_excluded)} excluded by rule, {len(to_model)} need the model")
     batches = screen.prepare_batches(
-        corpus, spec.inclusion_criteria, spec.exclusion_criteria, screen_dir, works=to_model
+        corpus,
+        spec.inclusion_criteria,
+        spec.exclusion_criteria,
+        screen_dir,
+        works=to_model,
+        roles=spec.roles,
     )
-    counts = screen.apply_verdicts(corpus, screen.load_verdicts(screen_dir / "verdicts.jsonl"))
+    counts = screen.apply_verdicts(corpus, screen.load_verdicts(screen_dir / "verdicts.jsonl", roles=spec.roles))
     batch_bytes = sum(path.stat().st_size for path in batches)
     print(f"  {len(batches)} batches, {batch_bytes / 1024:.0f} KB (~{batch_bytes // 4000} k tokens)")
     if counts["realigned"]:
         print(f"  {counts['realigned']} verdict(s) relocated by checksum after the corpus shifted")
     if counts["unverified"]:
-        print(f"  [WARN] {counts['unverified']} verdict(s) carry no checksum and could not be "
-              f"verified; re-screen them if the corpus has changed since they were written")
+        print(
+            f"  [WARN] {counts['unverified']} verdict(s) carry no checksum and could not be "
+            f"verified; re-screen them if the corpus has changed since they were written"
+        )
     if counts["misaligned"]:
         print(f"  [WARN] {counts['misaligned']} verdict(s) named a different paper and were refused")
     if counts["unscreened"] + counts["by_rule"] == len(corpus):
         print(f"  no verdicts yet -- answer the batches into {screen_dir / 'verdicts.jsonl'}, then re-run")
     else:
-        print(f"  include {counts['include']}, exclude {counts['exclude']}, "
-              f"unsure {counts['unsure']}, unscreened {counts['unscreened']}")
-    screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
+        print(
+            f"  include {counts['include']}, exclude {counts['exclude']}, "
+            f"unsure {counts['unsure']}, unscreened {counts['unscreened']}"
+        )
+        screened = counts["include"] + counts["exclude"] + counts["unsure"]
+        if screened and not counts["roled"]:
+            print("  [WARN] no verdict carries a role; reading_plan.md cannot group by paper kind")
+        elif screened:
+            print(f"  roles on {counts['roled']}/{screened} screened work(s)")
+    review_queue = screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
 
     print("\n[6/7] extract")
     # Only works that BOTH passed the gate and were screened in are worth reading.
@@ -174,7 +193,18 @@ def run(spec: SearchSpec) -> int:
         included = passed
         print("  no screening verdicts yet; preparing tasks for every validated work")
     extract_dir = cfg.out_dir / "extract"
-    tasks = extract.prepare_tasks(included, extract_dir, schema=spec.extraction_schema)
+    # The works that will be rendered into refs.bib, and the keys they will carry there.
+    # Extraction is given those keys so that evidence.csv can be joined to the bibliography
+    # -- the output contract requires every cite_key to name a real entry, and tasks used to
+    # be handed placeholders like work007 instead.
+    bib_works = included or passed
+    cite_keys = export.cite_keys_for(bib_works)
+    tasks = extract.prepare_tasks(
+        included,
+        extract_dir,
+        schema=spec.extraction_schema,
+        cite_keys=cite_keys if included else None,
+    )
     rows = extract.load_rows(extract_dir / "rows.jsonl")
     accepted, complaints = extract.validate_rows(rows, schema=spec.extraction_schema)
     print(f"  {len(tasks)} extraction tasks, {len(accepted)}/{len(rows)} rows accepted")
@@ -189,11 +219,20 @@ def run(spec: SearchSpec) -> int:
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
-    report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known,
-                         gold=gold_result)
+    report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known, gold=gold_result)
+    placed = plan.write_reading_plan(
+        cfg.out_dir / "reading_plan.md",
+        bib_works,
+        cfg.question,
+        cite_keys=cite_keys,
+        review_queue=review_queue,
+        quarantined=held,
+    )
+    conflicts = conflict.find_conflicts(accepted, spec.extraction_schema)
+    conflict.write_conflicts(cfg.out_dir / "conflicts.md", conflicts, len(accepted))
 
     # Only validated works reach the bibliography. Quarantined ones never appear.
-    entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", included or passed)
+    entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
     errors = [finding for finding in findings if finding.level == "error"]
     kept = export.write_evidence_csv(
         cfg.out_dir / "evidence.csv", accepted, columns=export.columns_for(spec.extraction_schema)
@@ -202,6 +241,15 @@ def run(spec: SearchSpec) -> int:
     print(f"  corpus {len(corpus)} | validated {len(passed)} | quarantined {held}")
     print(f"  refs.bib: {entry_count} entries, {len(errors)} errors")
     print(f"  evidence.csv: {kept} rows, each with a source quote")
+    print(
+        f"  reading_plan.md: foundation {placed.get('foundation', 0)}, "
+        f"core evidence {placed.get('core evidence', 0)}, frontier {placed.get('frontier', 0)}"
+    )
+    if conflicts:
+        print(
+            f"  conflicts.md: {len(conflicts)} group(s) of rows disagree by more than "
+            f"{conflict.DISAGREEMENT_RATIO:g}x -- read the quotes before citing either side"
+        )
     if uncitable:
         print(f"  {len(uncitable)} work(s) dropped as uncitable (no author on the index record)")
     for finding in errors[:5]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from litsearch import rank
 from litsearch.config import SearchConfig
 from litsearch.corpus import Corpus, title_similarity
 from litsearch.gate import VERIFIED, Verdict
@@ -57,24 +58,38 @@ def write_quarantine(path: Path, verdicts: list[Verdict]) -> int:
     return len(held)
 
 
-def write_shortlist(path: Path, works: list, limit: int = 50) -> None:
-    """A readable table of what survived the gate, most cited first."""
+def write_shortlist(path: Path, works: list, limit: int = 50, now_year: int | None = None) -> None:
+    """A readable table of what survived the gate, best first.
+
+    Ordered by citations per year rather than by raw citation count. The raw count is a
+    function of age as much as of impact, so sorting on it puts the oldest papers at the
+    top of every search and pushes the current state of the art -- usually the reason for
+    the search -- off the end of the table. Both numbers are shown, so the ordering can be
+    disagreed with rather than merely trusted.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    ranked = sorted(works, key=lambda w: w.cited_by_count, reverse=True)[:limit]
+    ranked = rank.rank(works, now_year=now_year)[:limit]
     lines = [
         "# Validated shortlist",
         "",
-        f"{len(works)} works passed the validation gate; the top {len(ranked)} by citation count:",
+        f"{len(works)} works passed the validation gate; the top {len(ranked)} by citations per year.",
         "",
-        "| Cites | Year | Title | Venue | Validated by | OA PDF |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "`Cited here` is how many other works in this corpus cite this one -- a landmark signal",
+        "local to this question. It counts only references the search actually fetched, so a zero",
+        "means the citation was not retrieved rather than that it does not exist.",
+        "",
+        "| Cites/yr | Cites | Cited here | Year | Role | Title | Venue | Validated by | OA PDF |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
-    for work in ranked:
+    for work, signal in ranked:
         title = (work.title or "")[:70].replace("|", "/")
         venue = (work.venue or "")[:30].replace("|", "/")
         year = work.year or "-"
         pdf = "yes" if work.oa_pdf_url else "-"
-        lines.append(f"| {work.cited_by_count} | {year} | {title} | {venue} | {work.validation_source} | {pdf} |")
+        lines.append(
+            f"| {signal['citations_per_year']} | {work.cited_by_count} | {signal['in_corpus_citations']} "
+            f"| {year} | {work.role or '-'} | {title} | {venue} | {work.validation_source} | {pdf} |"
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -107,6 +122,7 @@ def write_run_log(
 
 # ------------------------------------------------------------------ gold-set recall
 
+
 def load_gold_set(path) -> list[dict]:
     """Read a gold set: papers a domain expert says must be found.
 
@@ -128,16 +144,18 @@ def gold_recall(corpus, gold: list[dict]) -> dict:
     for paper in gold:
         doi = clean_doi(paper.get("doi"))
         work = by_doi.get(doi)
-        rows.append({
-            "key": paper.get("key", doi),
-            "doi": doi,
-            "title": paper.get("title", ""),
-            "found": work is not None,
-            # A paper found but screened out is a different failure from one never found,
-            # and conflating them hides which half of the pipeline needs work.
-            "screen": (work.screen or "unscreened") if work else "",
-            "validation": (work.validation or "") if work else "",
-        })
+        rows.append(
+            {
+                "key": paper.get("key", doi),
+                "doi": doi,
+                "title": paper.get("title", ""),
+                "found": work is not None,
+                # A paper found but screened out is a different failure from one never found,
+                # and conflating them hides which half of the pipeline needs work.
+                "screen": (work.screen or "unscreened") if work else "",
+                "validation": (work.validation or "") if work else "",
+            }
+        )
     found = sum(1 for r in rows if r["found"])
     return {
         "total": len(rows),

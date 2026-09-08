@@ -99,10 +99,10 @@ any stage can be re-run or inspected alone.
 | 1 | Retrieve | Python | Fan out across enabled sources. Cached, throttled, offline-replayable |
 | 2 | Merge | Python | Dedup DOI -> arXiv id -> fuzzy title. One record per paper |
 | 3 | Snowball | Python | Backward references + forward citations, until saturation |
-| 4 | Screen | Claude (cheap) | Title+abstract vs criteria -> include / exclude / unsure |
+| 4 | Screen | Claude (cheap) | Title+abstract vs criteria -> include / exclude / unsure, plus what kind of paper it is |
 | 5 | **Validate** | bibcheck | **The hard gate.** Only `verified` works proceed |
 | 6 | Extract | Claude (strong) | Structured fields, each with a mandatory `source_quote` |
-| 7 | Render | Python | bibtex, evidence table, synthesis, quarantine, run log |
+| 7 | Render | Python | bibtex, evidence table, reading plan, conflict candidates, quarantine, run log |
 
 ### Sources
 
@@ -140,6 +140,26 @@ Keyword search alone systematically misses papers that use different vocabulary 
 idea. Recall comes from snowballing: follow references backward and citations forward from
 seed papers, and keep going until new-unique-papers-per-round falls below a threshold. Both
 OpenAlex and Semantic Scholar expose this for free, so it costs no model tokens.
+
+The same reference lists are reused for ranking. A paper cited by several *other members of
+this corpus* is foundational to this question, whatever its global citation count says, and
+that signal is local to the search in a way a raw count never is. Ranking uses citations per
+year rather than the raw count for the same reason: a count is a function of age as much as
+of impact, so sorting on it puts the oldest papers at the top of every search and pushes the
+current state of the art -- usually the reason for the search -- off the end of the table.
+
+### What a finished run leaves you
+
+Beyond `refs.bib` and `evidence.csv`, two files exist to be read rather than cited:
+
+- **`reading_plan.md`** -- the validated works sorted into foundation, core evidence and
+  frontier, each phase carrying the rule that filled it. Metadata only; it makes no claim
+  about what any paper found.
+- **`conflicts.md`** -- groups of evidence rows measured under the same stated conditions
+  whose values differ by more than 3x, with both verbatim quotes. Every flag is a question,
+  and the usual answer is different devices or a misread unit rather than a real dispute.
+  It exists because "the literature disagrees" was the one claim the pipeline had no way to
+  substantiate.
 
 ### Anti-hallucination
 
