@@ -30,8 +30,10 @@ def test_query_terms_drop_stopwords_and_short_tokens():
 
 def test_an_on_topic_paper_passes():
     terms = relevance.terms_from_queries(QUERIES)
-    work = Work(title="Millisecond coherence in a tantalum transmon qubit",
-                abstract="We measure T1 and T2 of a superconducting device.")
+    work = Work(
+        title="Millisecond coherence in a tantalum transmon qubit",
+        abstract="We measure T1 and T2 of a superconducting device.",
+    )
     assert relevance.is_on_topic(work, terms)
 
 
@@ -110,10 +112,14 @@ def test_prefetch_skips_dois_already_cached(client, monkeypatch):
 
 def test_prefetch_populates_the_cache_in_the_per_work_shape(client, monkeypatch):
     c = client(offline=False)
-    payload = {"message": {"items": [
-        {"DOI": "10.1/a", "title": ["Paper A"]},
-        {"DOI": "10.1/B", "title": ["Paper B"]},
-    ]}}
+    payload = {
+        "message": {
+            "items": [
+                {"DOI": "10.1/a", "title": ["Paper A"]},
+                {"DOI": "10.1/B", "title": ["Paper B"]},
+            ]
+        }
+    }
     monkeypatch.setattr(c, "_get", lambda *a, **k: payload)
     found = batch.prefetch_crossref(c, ["10.1/a", "10.1/b"], verbose=False)
     assert found == 2
@@ -141,7 +147,9 @@ def test_a_doi_the_batch_misses_is_not_cached_as_absent(client, monkeypatch):
 def test_batches_are_chunked(client, monkeypatch):
     c = client(offline=False)
     seen = []
-    monkeypatch.setattr(c, "_get", lambda key, url, params=None, **k: seen.append(params) or {"message": {"items": []}})
+    monkeypatch.setattr(
+        c, "_get", lambda key, url, params=None, **k: seen.append(params) or {"message": {"items": []}}
+    )
     batch.prefetch_crossref(c, [f"10.1/{i}" for i in range(120)], batch_size=50, verbose=False)
     assert len(seen) == 3, "120 DOIs at 50 per request is 3 requests, not 120"
 
@@ -149,7 +157,9 @@ def test_batches_are_chunked(client, monkeypatch):
 def test_duplicate_dois_are_requested_once(client, monkeypatch):
     c = client(offline=False)
     seen = []
-    monkeypatch.setattr(c, "_get", lambda key, url, params=None, **k: seen.append(params) or {"message": {"items": []}})
+    monkeypatch.setattr(
+        c, "_get", lambda key, url, params=None, **k: seen.append(params) or {"message": {"items": []}}
+    )
     batch.prefetch_crossref(c, ["10.1/a"] * 40, batch_size=50, verbose=False)
     assert len(seen) == 1
     assert seen[0]["filter"].count("doi:") == 1
@@ -162,32 +172,39 @@ REQUIRED = ("superconduct", "transmon", "fluxonium", "josephson")
 
 
 def test_a_forbidden_platform_is_excluded_without_a_model_call():
-    work = Work(title="Room-temperature coherence in vanadyl phthalocyanine spin qubits",
-                abstract="We report magnetic relaxation and quantum coherence.")
+    work = Work(
+        title="Room-temperature coherence in vanadyl phthalocyanine spin qubits",
+        abstract="We report magnetic relaxation and quantum coherence.",
+    )
     verdict, reason = relevance.triage(work, REQUIRED, FORBIDDEN)
     assert verdict == relevance.RULE_EXCLUDE
     assert "vanadyl" in reason
 
 
 def test_a_paper_missing_every_subject_term_is_excluded():
-    work = Work(title="Noise-adaptive compiler mappings for quantum computers",
-                abstract="A compiler pass for qubit mapping.")
+    work = Work(
+        title="Noise-adaptive compiler mappings for quantum computers", abstract="A compiler pass for qubit mapping."
+    )
     verdict, _ = relevance.triage(work, REQUIRED, FORBIDDEN)
     assert verdict == relevance.RULE_EXCLUDE
 
 
 def test_an_on_topic_paper_still_goes_to_the_model():
     """Rules may prove a paper is off subject; they must never assert it qualifies."""
-    work = Work(title="Enhanced coherence of all-nitride superconducting qubits",
-                abstract="Improving the coherence of superconducting qubits.")
+    work = Work(
+        title="Enhanced coherence of all-nitride superconducting qubits",
+        abstract="Improving the coherence of superconducting qubits.",
+    )
     verdict, _ = relevance.triage(work, REQUIRED, FORBIDDEN)
     assert verdict == relevance.NEEDS_AI, "only a read abstract can confirm a measurement"
 
 
 def test_forbidden_beats_required():
     """A superconducting resonator hosting spin qubits is still the wrong platform."""
-    work = Work(title="Vanadyl spin qubit arrays on superconducting resonators",
-                abstract="2D vanadyl porphyrin layers with superior spin coherence.")
+    work = Work(
+        title="Vanadyl spin qubit arrays on superconducting resonators",
+        abstract="2D vanadyl porphyrin layers with superior spin coherence.",
+    )
     verdict, reason = relevance.triage(work, REQUIRED, FORBIDDEN)
     assert verdict == relevance.RULE_EXCLUDE and "vanadyl" in reason
 
@@ -211,12 +228,16 @@ def test_no_rules_means_everything_reaches_the_model():
 
 def test_rule_verdicts_survive_applying_model_verdicts():
     """Triage runs before the batches; its verdicts must not be wiped on the way back."""
-    from litsearch.corpus import Corpus
     from litsearch import screen
+    from litsearch.corpus import Corpus
 
     corpus = Corpus()
-    corpus.add_all([Work(title="Transmon paper", doi="10.1/a", abstract="superconducting"),
-                    Work(title="NV paper", doi="10.1/b", abstract="nitrogen-vacancy centre")])
+    corpus.add_all(
+        [
+            Work(title="Transmon paper", doi="10.1/a", abstract="superconducting"),
+            Work(title="NV paper", doi="10.1/b", abstract="nitrogen-vacancy centre"),
+        ]
+    )
     relevance.triage_all(corpus.works, REQUIRED, FORBIDDEN)
     counts = screen.apply_verdicts(corpus, {0: {"verdict": "include", "reason": "on topic"}})
     assert counts["include"] == 1

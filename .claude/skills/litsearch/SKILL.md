@@ -85,7 +85,10 @@ Read `$LITSEARCH_OUT_DIR/<name>/run.json` afterwards and check two things:
 
 Delegate to the **lit-screener** subagent in batches of ~25 works from `corpus.jsonl`,
 with the inclusion and exclusion criteria. It returns `include`, `exclude` or `unsure`
-per work with a one-line reason.
+per work with a one-line reason, plus a `role` saying what kind of paper it is -- `review`,
+`primary`, `method` or `theory`. The role is what `reading_plan.md` groups by, and it costs
+nothing here because the abstract is already being read. Omitted when the abstract does not
+make the kind clear; a guessed role is worse than none.
 
 Surface every `unsure` to the user rather than deciding yourself. That list is usually
 short and is where the interesting edge cases live.
@@ -103,9 +106,19 @@ quote is empty. Do not bypass it.
 ### Stage 7 - Report
 
 `run_search.py` already writes `corpus.jsonl`, `refs.bib`, `shortlist.md`,
-`quarantine.md`, `needs_review.md` and `run.json`, into `$LITSEARCH_OUT_DIR` (default
-`~/litsearch-runs/<name>/`) -- **outside the repository**, because run outputs are data and
-must never be committed.
+`reading_plan.md`, `conflicts.md`, `quarantine.md`, `needs_review.md` and `run.json`, into
+`$LITSEARCH_OUT_DIR` (default `~/litsearch-runs/<name>/`) -- **outside the repository**,
+because run outputs are data and must never be committed.
+
+Two of those are worth opening before you write anything:
+
+- **`reading_plan.md`** sorts the validated works into foundation, core evidence and
+  frontier, by metadata alone. It is the right thing to hand a user who asked "where do I
+  start" rather than "what is the number".
+- **`conflicts.md`** lists groups of `evidence.csv` rows, measured under the same stated
+  conditions, whose values differ by more than 3x -- with both quotes. Read it before
+  writing the "what is contested" section of any synthesis. Each flag is a question: the
+  usual answer is different devices or a misread unit, and you have to look to tell.
 
 Add `evidence.csv` from stage 6, then write whichever deliverable was asked for. The rules
 for each are in `docs/OUTPUT_FORMATS.md` and are not negotiable: every claim carries a cite
@@ -125,3 +138,23 @@ Exit code 0 or 1 is fine; 2 means the bibliography has errors and is not finishe
 Tell the user plainly: how many works were retrieved, how many survived the gate, how
 many are quarantined and why, and which known items were missed. If retrieval looked
 thin, say so rather than presenting a short list as a complete answer.
+
+## Follow-up questions
+
+The interesting questions arrive after the user has read the output, and every one of them
+is answerable from files on disk. None of them is answerable from memory, and answering
+from memory is the failure this whole pipeline exists to prevent.
+
+- **"Does that pattern hold?"** -- e.g. "recent papers all use tantalum, older ones
+  niobium". Check it against `corpus.jsonl` and `evidence.csv` and answer with the counts.
+  If the corpus cannot settle it, say which papers would be needed rather than guessing.
+- **"Why do these two disagree?"** -- start from the `conflicts.md` entry and its two
+  quotes. If the conditions differ in a way the schema does not capture, the answer is a
+  new extraction column and a re-run, not a verdict about who is right.
+- **"You missed X."** -- add it to `KNOWN_ITEMS` or `seed_dois` and re-run retrieval. Never
+  hand-write the entry. A re-run is cheap: the index cache makes it nearly free, and
+  screening verdicts survive it because they are relocated by checksum rather than by
+  position.
+- **"Fill this gap."** -- add vocabulary to `QUERIES` covering the gap and re-run. The
+  corpus is additive, so the new works merge into the existing one and only the new works
+  need screening.

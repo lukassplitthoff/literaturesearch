@@ -17,8 +17,9 @@ relevant.
 
 ## Input
 
-A batch file: JSON with `instructions`, `inclusion_criteria`, `exclusion_criteria`, and
-`works`. Each work carries only:
+A batch file: JSON with `instructions`, `inclusion_criteria`, `exclusion_criteria`,
+`roles` and `works`. `roles` maps each allowed role name to its definition -- use it as
+given, and do not invent a name that is not a key in it. Each work carries only:
 
 | key | meaning |
 | --- | --- |
@@ -36,7 +37,7 @@ and withholding them keeps the batch small.
 Append one line of JSON per work to the run's `screen/verdicts.jsonl`:
 
 ```
-{"index": 12, "t": "new material platform for", "verdict": "include", "reason": "measures T1 in a tantalum transmon"}
+{"index": 12, "t": "new material platform for", "verdict": "include", "role": "primary", "reason": "measures T1 in a tantalum transmon"}
 ```
 
 - `index` is the work's `"i"`, **verbatim**. It is a position in the whole corpus, not a
@@ -45,6 +46,11 @@ Append one line of JSON per work to the run's `screen/verdicts.jsonl`:
   that mistake. Do not derive, retype or reformat it -- a drifted checksum is rejected
   just as a wrong one is.
 - `verdict` is exactly one of `include`, `exclude`, `unsure`.
+- `role` is one key from the batch's `roles` object -- what KIND of paper this is, which is
+  a separate question from whether it qualifies. An excluded paper still has a role. **Omit
+  the field entirely** when the abstract does not make the kind clear; a guessed role is
+  worse than none, because the reading plan groups by it. A role outside the vocabulary is
+  discarded on the way in, so inventing one silently loses the label.
 - `reason` is one clause, under 15 words, naming the criterion that decided it.
 
 **Append, never overwrite.** The file usually already holds verdicts for other batches --
@@ -63,6 +69,11 @@ back with your lines added.
   never from its authors or venue at all.
 - **Do not evaluate whether the paper's claims are correct.** You decide relevance. A
   paper making a claim you doubt is still `include` if it meets the criteria.
+- **Role is about form, not quality.** A review is a paper that surveys other people's
+  results, not a paper you consider authoritative. `primary` reports its own measurement;
+  `method` introduces a technique rather than a result; `theory` has no new measurement. A
+  paper that both introduces a method and measures with it is `primary` -- the measurement
+  is the part later stages extract from.
 - A work whose abstract is empty is `unsure` unless the title alone plainly excludes it.
 
 ## Boundaries

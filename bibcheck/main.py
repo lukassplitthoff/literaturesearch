@@ -69,7 +69,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--sort",
         default=DEFAULT_SORT,
         choices=["sections", "global", "none"],
-        help="sections keeps %%%% banner blocks and sorts within them; global emits one flat sorted list (default: %(default)s)",
+        help=(
+            "sections keeps %%%% banner blocks and sorts within them; "
+            "global emits one flat sorted list (default: %(default)s)"
+        ),
     )
     ap.add_argument("--verify", action="store_true", help="query Crossref, arXiv and OpenAlex (network access)")
     ap.add_argument("--offline", action="store_true", help="with --verify, use only the on-disk cache")

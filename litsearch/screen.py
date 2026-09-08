@@ -36,15 +36,33 @@ DEFAULT_BATCH_SIZE = 25
 # verdict. 600 characters keeps the opening claim and the usual "we measure X" sentence.
 ABSTRACT_CHARS = 600
 
+# The role vocabulary: what KIND of paper this is, as opposed to whether it is relevant.
+# Deliberately small. A screener choosing between fifteen labels from a title and an
+# abstract will not be consistent, and every label here has to be decidable from an
+# abstract alone. An unrecognised or absent role is recorded as "" -- unclassified is an
+# honest answer, and every view that groups by role renders it as its own group.
+ROLES = ("review", "primary", "method", "theory")
+
+ROLE_GUIDE = {
+    "review": "reviews, surveys or meta-analyses other people's results",
+    "primary": "reports its own measurement, experiment or observation",
+    "method": "introduces a technique, device or protocol rather than a result",
+    "theory": "analytical or numerical work with no new measurement",
+}
+
 INSTRUCTIONS = (
     "For each work below, decide whether it meets the inclusion criteria. "
     "Reply with one JSON object per line and nothing else: "
     '{"index": <the work\'s "i">, "t": <the work\'s "c", copied verbatim>, '
-    '"verdict": "include|exclude|unsure", "reason": "<one short clause>"}. '
+    '"verdict": "include|exclude|unsure", "role": "<one of the roles below>", '
+    '"reason": "<one short clause>"}. '
     "Copy 'c' exactly as given -- do not derive, retype or reformat it. It is a checksum "
     "that catches a verdict applied to the wrong paper, and a wrong one is rejected. "
     "Use 'unsure' when the abstract does not say enough to decide -- that is a real answer, "
-    "not a failure. Judge relevance only; do not judge whether the paper is correct."
+    "not a failure. Judge relevance only; do not judge whether the paper is correct. "
+    "'role' says what kind of paper it is and is independent of the verdict -- an excluded "
+    "paper still has a role. Choose one key from the 'roles' object below, and omit the "
+    "field entirely if the abstract does not make the kind of paper clear."
 )
 
 # How much of the echoed title must match before a verdict is trusted.
@@ -86,12 +104,18 @@ def prepare_batches(
     batch_size: int = DEFAULT_BATCH_SIZE,
     abstract_chars: int = ABSTRACT_CHARS,
     works: list[Work] | None = None,
+    roles: tuple[str, ...] = ROLES,
 ) -> list[Path]:
     """Write screening batches. Returns the paths written.
 
     ``works`` overrides which works are batched -- pass the survivors of triage so the
     model is not asked about papers a rule already settled. Indices stay global, matching
     positions in the corpus, so verdicts apply correctly on the way back.
+
+    ``roles`` is the vocabulary a screener may label a paper with. The guide travels in the
+    batch rather than living only in the agent definition, so every backend that answers a
+    batch -- the subagent, the SDK runner, a human with a text editor -- sees one set of
+    definitions instead of three that can drift apart.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -119,6 +143,7 @@ def prepare_batches(
             "instructions": INSTRUCTIONS,
             "inclusion_criteria": inclusion,
             "exclusion_criteria": exclusion,
+            "roles": {name: ROLE_GUIDE.get(name, "") for name in roles},
             "works": [work_summary(work, global_index[id(work)], abstract_chars) for work in chunk],
         }
         path = out_dir / f"batch_{start // batch_size:02d}.json"
@@ -129,8 +154,13 @@ def prepare_batches(
     return paths
 
 
-def load_verdicts(path: Path) -> dict[int, dict]:
-    """Read a verdicts JSONL file. Malformed or unknown verdicts are skipped, not guessed."""
+def load_verdicts(path: Path, roles: tuple[str, ...] = ROLES) -> dict[int, dict]:
+    """Read a verdicts JSONL file. Malformed or unknown verdicts are skipped, not guessed.
+
+    A role outside ``roles`` is discarded rather than kept as written. The fixed vocabulary
+    is the whole reason the label is groupable, and one invented label creates a category
+    of one that every downstream view then has to render.
+    """
     path = Path(path)
     if not path.exists():
         return {}
@@ -145,11 +175,13 @@ def load_verdicts(path: Path) -> dict[int, dict]:
             continue
         index = row.get("index")
         verdict = str(row.get("verdict", "")).lower()
+        role = str(row.get("role", "")).strip().lower()
         if isinstance(index, int) and verdict in VALID_VERDICTS:
             verdicts[index] = {
                 "verdict": verdict,
                 "reason": str(row.get("reason", "")),
                 "t": str(row.get("t", "")),
+                "role": role if role in roles else "",
             }
     return verdicts
 
@@ -186,8 +218,17 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
     review queue. ``keep_rule_verdicts=False`` forces a clean slate when re-screening from
     scratch.
     """
-    counts = {INCLUDE: 0, EXCLUDE: 0, UNSURE: 0, "unscreened": 0, "by_rule": 0,
-              "misaligned": 0, "unverified": 0, "realigned": 0}
+    counts = {
+        INCLUDE: 0,
+        EXCLUDE: 0,
+        UNSURE: 0,
+        "unscreened": 0,
+        "by_rule": 0,
+        "misaligned": 0,
+        "unverified": 0,
+        "realigned": 0,
+        "roled": 0,
+    }
 
     # The index is a hint; the checksum is the identity. Corpus positions shift whenever
     # dedup or triage changes -- merging one duplicate renumbers every work after it -- and
@@ -212,9 +253,7 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
             # counted a second time as a misalignment.
             stale.add(index)
             counts["realigned"] += 1
-    verdicts = {
-        index: row for index, row in verdicts.items() if index not in stale or index in relocated
-    }
+    verdicts = {index: row for index, row in verdicts.items() if index not in stale or index in relocated}
     verdicts.update(relocated)
     for index, work in enumerate(corpus.works):
         row = verdicts.get(index)
@@ -239,11 +278,15 @@ def apply_verdicts(corpus: Corpus, verdicts: dict[int, dict], keep_rule_verdicts
                 continue
             work.screen = ""
             work.screen_reason = ""
+            work.role = ""
             counts["unscreened"] += 1
             continue
         work.screen = row["verdict"]
         work.screen_reason = row["reason"]
+        work.role = row.get("role", "")
         counts[row["verdict"]] += 1
+        if work.role:
+            counts["roled"] += 1
     return counts
 
 

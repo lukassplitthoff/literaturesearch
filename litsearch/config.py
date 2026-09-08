@@ -33,7 +33,9 @@ def _repo_root() -> Path | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
             cwd=Path(__file__).resolve().parent,
         )
     except (OSError, subprocess.SubprocessError):
@@ -58,6 +60,7 @@ def warn_if_inside_repo(path: Path) -> str:
         f"output directory {path} is inside the git repository at {repo}. "
         f"Run outputs must never be committed. Set {OUT_DIR_ENV} to a path outside the repo."
     )
+
 
 # Sources that need no credential. NASA ADS is deliberately absent: it needs a token,
 # and it is deferred until one exists. See litsearch/sources/ads.py.

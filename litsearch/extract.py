@@ -155,8 +155,7 @@ def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) ->
         unsupported = [
             field
             for field in schema
-            if row.get(field) not in (None, "", [])
-            and not _quote_supports(row.get(field), quote)
+            if row.get(field) not in (None, "", []) and not _quote_supports(row.get(field), quote)
         ]
         if unsupported:
             complaints.append(f"{key}: quote does not contain {', '.join(unsupported)}")

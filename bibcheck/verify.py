@@ -582,7 +582,8 @@ def verify_entry(entry_report: EntryReport, client: IndexClient) -> Verification
                 add(
                     "warning",
                     "preprint-published",
-                    f"arXiv:{entry_report.arxiv_id} is now published as doi {arxiv.published_doi}{detail}; upgrade the entry",
+                    f"arXiv:{entry_report.arxiv_id} is now published as "
+                    f"doi {arxiv.published_doi}{detail}; upgrade the entry",
                 )
             record = arxiv
 

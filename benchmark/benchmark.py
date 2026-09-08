@@ -47,16 +47,43 @@ BASELINE = HERE / "baseline.json"
 # The same rules the worked example uses. Kept here rather than imported so the benchmark
 # measures a fixed configuration even if the example is later retuned.
 SCREEN_FORBIDDEN = (
-    "optomechanic", "opto-mechanic", "magnon", "nanophotonic", "photonic crystal",
-    "silicon photonic", "optical fiber", "optical fibre", "optical parametric oscillator",
-    "telecom wavelength", "cold atom", "atomic ensemble", "bose-einstein",
-    "nitrogen-vacancy", "nv centre", "nv center", "trapped ion", "trapped-ion",
-    "molecular spin", "single-ion magnet", "vanadyl",
+    "optomechanic",
+    "opto-mechanic",
+    "magnon",
+    "nanophotonic",
+    "photonic crystal",
+    "silicon photonic",
+    "optical fiber",
+    "optical fibre",
+    "optical parametric oscillator",
+    "telecom wavelength",
+    "cold atom",
+    "atomic ensemble",
+    "bose-einstein",
+    "nitrogen-vacancy",
+    "nv centre",
+    "nv center",
+    "trapped ion",
+    "trapped-ion",
+    "molecular spin",
+    "single-ion magnet",
+    "vanadyl",
 )
 SCREEN_REQUIRED = (
-    "superconduct", "transmon", "fluxonium", "josephson", "snail",
-    "circuit qed", "cqed", "microwave cavity", "microwave resonator",
-    "coaxial cavity", "3d cavity", "cooper pair", "bosonic mode", "bosonic qubit",
+    "superconduct",
+    "transmon",
+    "fluxonium",
+    "josephson",
+    "snail",
+    "circuit qed",
+    "cqed",
+    "microwave cavity",
+    "microwave resonator",
+    "coaxial cavity",
+    "3d cavity",
+    "cooper pair",
+    "bosonic mode",
+    "bosonic qubit",
 )
 QUERIES = [
     "parametric beam splitter interaction bosonic cavity microwave",
@@ -72,18 +99,34 @@ QUERIES = [
 DUPLICATE_CASES = [
     (
         "arXiv DOI vs publisher DOI",
-        Work(title="Disentangling Losses in Tantalum Superconducting Circuits",
-             doi="10.1103/physrevx.13.041005", year="2023", authors=["Chapman, Benjamin J."]),
-        Work(title="Disentangling Losses in Tantalum Superconducting Circuits",
-             doi="10.48550/arxiv.2301.07848", arxiv_id="2301.07848", year="2023",
-             authors=["Benjamin J. Chapman"]),
+        Work(
+            title="Disentangling Losses in Tantalum Superconducting Circuits",
+            doi="10.1103/physrevx.13.041005",
+            year="2023",
+            authors=["Chapman, Benjamin J."],
+        ),
+        Work(
+            title="Disentangling Losses in Tantalum Superconducting Circuits",
+            doi="10.48550/arxiv.2301.07848",
+            arxiv_id="2301.07848",
+            year="2023",
+            authors=["Benjamin J. Chapman"],
+        ),
     ),
     (
         "two publisher DOIs, author name order differs",
-        Work(title="High-fidelity parametric beamsplitting with a parity-protected converter",
-             doi="10.1038/s41467-023-41104-0", year="2023", authors=["Yao Lu"]),
-        Work(title="High-fidelity parametric beamsplitting with a parity-protected converter",
-             doi="10.1038/s41467-023-41822-5", year="2023", authors=["Lu, Yao"]),
+        Work(
+            title="High-fidelity parametric beamsplitting with a parity-protected converter",
+            doi="10.1038/s41467-023-41104-0",
+            year="2023",
+            authors=["Yao Lu"],
+        ),
+        Work(
+            title="High-fidelity parametric beamsplitting with a parity-protected converter",
+            doi="10.1038/s41467-023-41822-5",
+            year="2023",
+            authors=["Lu, Yao"],
+        ),
     ),
 ]
 
@@ -91,10 +134,8 @@ DUPLICATE_CASES = [
 DISTINCT_CASES = [
     (
         "Part I vs Part II",
-        Work(title="Coherence in transmon qubits Part I", doi="10.1/p1", year="2023",
-             authors=["Ann Author"]),
-        Work(title="Coherence in transmon qubits Part II", doi="10.1/p2", year="2023",
-             authors=["Ann Author"]),
+        Work(title="Coherence in transmon qubits Part I", doi="10.1/p1", year="2023", authors=["Ann Author"]),
+        Work(title="Coherence in transmon qubits Part II", doi="10.1/p2", year="2023", authors=["Ann Author"]),
     ),
 ]
 
@@ -170,6 +211,7 @@ def measure() -> dict:
     text = export.build_bibtex(citable)
     from bibcheck.parser import loads
     from bibcheck.rules import check_database
+
     reports, file_findings = check_database(loads(text))
     findings = list(file_findings)
     for report in reports:

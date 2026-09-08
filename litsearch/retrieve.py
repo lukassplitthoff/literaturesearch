@@ -32,8 +32,11 @@ def run(fetcher: Fetcher, cfg: SearchConfig) -> Corpus:
                 continue
             try:
                 works = module.search(
-                    fetcher, query, limit=cfg.per_query_limit,
-                    year_from=cfg.year_from, year_to=cfg.year_to,
+                    fetcher,
+                    query,
+                    limit=cfg.per_query_limit,
+                    year_from=cfg.year_from,
+                    year_to=cfg.year_to,
                 )
             except Exception as exc:  # a dead source degrades the run, never aborts it
                 print(f"  [warn] {name} failed: {type(exc).__name__}: {exc}")

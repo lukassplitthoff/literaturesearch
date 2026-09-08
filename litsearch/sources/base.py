@@ -25,7 +25,7 @@ def clean_doi(value: str | None) -> str | None:
     text = str(value).strip().lower()
     for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
         if text.startswith(prefix):
-            text = text[len(prefix):]
+            text = text[len(prefix) :]
     text = text.strip()
     return text if text.startswith("10.") else None
 
@@ -66,6 +66,10 @@ class Work:
     is_seed: bool = False
     screen: str = ""
     screen_reason: str = ""
+    # What kind of paper this is -- review, primary, method, theory. Set by the screener
+    # in the same pass that decides relevance, because it is nearly free there and would
+    # cost a second read of every abstract anywhere else.
+    role: str = ""
     validation: str = ""
     validation_source: str = ""
 
@@ -102,6 +106,7 @@ class Work:
             "is_seed": self.is_seed,
             "screen": self.screen,
             "screen_reason": self.screen_reason,
+            "role": self.role,
             "validation": self.validation,
             "validation_source": self.validation_source,
         }

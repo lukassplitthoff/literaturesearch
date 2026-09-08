@@ -55,7 +55,7 @@ yields three rows.
 
 | Column | Rule |
 | --- | --- |
-| `cite_key` | Must match an entry in `refs.bib` |
+| `cite_key` | Must match an entry in `refs.bib`. Supplied to the extractor by `export.cite_keys_for`, so the join holds by construction rather than by the extractor guessing |
 | `source_quote` | Verbatim sentence from the paper containing the value. **Mandatory** |
 | `confidence` | `full_text` only if the PDF was actually read, else `abstract_only` |
 | any value column | The number as stated, or `null`. Never inferred, never recalled |
@@ -63,6 +63,62 @@ yields three rows.
 `litsearch.export.write_evidence_csv` drops any row with an empty quote, and
 `litsearch.extract.validate_rows` flags any row whose quote does not contain the digits of
 the value it claims. Do not bypass either.
+
+## `reading_plan.md` -- where to start
+
+Produced by `litsearch.plan.write_reading_plan`. Deterministic: it makes no model call and
+states no result. A ranked table answers "what survived the gate"; this answers the question
+someone actually has in front of forty validated papers, which is what to read first.
+
+Three disjoint phases, each carrying the rule that filled it:
+
+1. **Foundation** -- works the screener labelled `review`, then works that at least two
+   other members of this corpus cite. The second group is chosen by the corpus rather than
+   by global citation counts, so it is what *this question* treats as foundational.
+2. **Core evidence** -- established work, older than the frontier window, ranked.
+3. **Frontier** -- the last three years, ranked. Split out because recent work has not had
+   time to accumulate citations and would otherwise sort to the bottom of every list.
+
+Rules:
+
+- **Every row names a cite key that exists in `refs.bib`**, from the same mapping the
+  bibliography was built with.
+- **No row makes a claim about what a paper found.** Placement follows from role, year and
+  citation structure. A plan that summarises results is a synthesis wearing a plan's name --
+  that is `review.md`, and it has different rules.
+- **The phase rule is printed with the phase**, so a reader can disagree with a placement
+  instead of assuming it was judged.
+- **Rank is not relevance.** `Cites/yr` corrects the age bias in a raw count and introduces
+  its own; `Cited here` counts only references the search actually fetched, so a zero means
+  the citation was not retrieved, not that it does not exist. Both must be described that
+  way wherever they appear.
+- Ends by naming what is *not* in it: the review queue, the quarantine, and the coverage
+  limits in `run.json`.
+
+## `conflicts.md` -- candidate contradictions
+
+Produced by `litsearch.conflict.write_conflicts`. Groups `evidence.csv` rows by the
+conditions they were measured under and flags any group where two different papers report
+values differing by more than `DISAGREEMENT_RATIO` (3x).
+
+This exists because rule 4 of `review.md` -- say where papers disagree, and cite both --
+had nothing behind it. Written from impression, "the literature disagrees" is exactly the
+kind of unsourced claim the rest of the pipeline refuses to emit.
+
+Rules:
+
+- **A flag is a question, not a finding.** The usual explanations are dull: different
+  devices, a different definition of the quantity, a misread unit. Nothing in this file may
+  assert that a contradiction is real.
+- **Two rows from the same paper are never a conflict.** A paper reporting three devices is
+  not disagreeing with itself.
+- **Rows with different stated conditions are never compared.** A missing condition is its
+  own group, not a wildcard -- comparing an unstated material against tantalum manufactures
+  a disagreement out of an incomplete record.
+- **Both extremes appear with their verbatim quotes**, so the disagreement is judged from
+  the papers' own words rather than from two numbers.
+- The threshold is arbitrary and the file says so. A real contradiction narrower than it is
+  not flagged.
 
 ## `review.md` -- the synthesis
 
@@ -77,6 +133,9 @@ Structure:
 3. **How the field got there** -- the trend, the techniques that moved it, the disputes.
    Every sentence cited.
 4. **What is contested or uncertain.** Where papers disagree, say so and cite both.
+   Start from `conflicts.md` rather than from memory: it lists the groups of rows that
+   actually disagree, with both quotes. A disagreement not in that file needs a reason you
+   can point at -- a resolved conflict, or one the conditions explain -- not an impression.
 5. **Limits of this search** (rule 5 above).
 
 Prohibited: a "conclusion" paragraph that generalises beyond the rows; comparative claims

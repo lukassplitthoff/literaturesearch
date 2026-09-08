@@ -114,12 +114,12 @@ def work_to_entry_text(work: Work, index: int) -> str:
     return "\n".join(lines)
 
 
-def build_bibtex(works: list[Work], ascii_only: bool = True) -> str:
-    """Render every work, then let bibcheck normalise, re-key and sort the result.
+def _keyed_database(works: list[Work], ascii_only: bool = True):
+    """Parse the rendered works and let bibcheck normalise and re-key them.
 
-    ``ascii_only`` rewrites accented characters as LaTeX escapes ({'e} and friends). It
-    defaults on because a .bib full of raw UTF-8 trips cp1252 tooling on Windows, which is
-    what bibcheck's non-ascii warning is for -- 165 of them on the first real run.
+    Entries come back in the order ``works`` was given, before any sort, which is what
+    makes ``cite_keys_for`` able to say which key belongs to which work without matching
+    on metadata afterwards.
     """
     blocks = [work_to_entry_text(work, index) for index, work in enumerate(works, start=1)]
     database = loads("\n\n".join(blocks) + "\n")
@@ -130,7 +130,35 @@ def build_bibtex(works: list[Work], ascii_only: bool = True) -> str:
         if entry.new_key:
             entry.key = entry.new_key
             entry.new_key = None
-    return dumps(database, sort="global")
+    return database
+
+
+def build_bibtex(works: list[Work], ascii_only: bool = True) -> str:
+    """Render every work, then let bibcheck normalise, re-key and sort the result.
+
+    ``ascii_only`` rewrites accented characters as LaTeX escapes ({'e} and friends). It
+    defaults on because a .bib full of raw UTF-8 trips cp1252 tooling on Windows, which is
+    what bibcheck's non-ascii warning is for -- 165 of them on the first real run.
+    """
+    return dumps(_keyed_database(works, ascii_only=ascii_only), sort="global")
+
+
+def cite_keys_for(works: list[Work], ascii_only: bool = True) -> dict[int, str]:
+    """Map a work's position in ``works`` to the key it will carry in refs.bib.
+
+    Keys are assigned during rendering, and collision suffixes depend on which other works
+    are present, so a key cannot be derived from one work alone. Rendering the same list
+    the bibliography is built from is the only way to get the same answer.
+
+    Without this, every stage downstream of the bibliography invented its own identifier --
+    extraction tasks were keyed ``work007`` while refs.bib said ``Place2021`` -- and the
+    output contract requires every ``cite_key`` in evidence.csv to name an entry in the
+    bibliography. Uncitable works are absent from the mapping, exactly as they are absent
+    from refs.bib.
+    """
+    positions = [position for position, work in enumerate(works) if citable(work)]
+    database = _keyed_database([works[position] for position in positions], ascii_only=ascii_only)
+    return {position: entry.key for position, entry in zip(positions, database.entries)}
 
 
 def write_bibtex(path: Path, works: list[Work], ascii_only: bool = True) -> tuple[int, list, list[Work]]:
