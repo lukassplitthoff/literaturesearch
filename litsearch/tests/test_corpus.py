@@ -18,8 +18,13 @@ def test_doi_is_the_strongest_identity():
     corpus = Corpus()
     corpus.add(make(doi="10.1038/s41467-021-22030-5", sources=["openalex"]))
     # Same DOI, a different title spelling: still one work.
-    corpus.add(make(title="New Material Platform For Transmon Qubits", doi="10.1038/s41467-021-22030-5",
-                    sources=["semanticscholar"]))
+    corpus.add(
+        make(
+            title="New Material Platform For Transmon Qubits",
+            doi="10.1038/s41467-021-22030-5",
+            sources=["semanticscholar"],
+        )
+    )
     assert len(corpus) == 1
     assert corpus.works[0].sources == ["openalex", "semanticscholar"]
 
@@ -55,8 +60,14 @@ def test_readding_the_same_works_creates_nothing_new():
 
 def test_merge_is_additive_and_never_overwrites():
     target = make(doi="10.1/a", venue="Nature", authors=["First A"], cited_by_count=10, sources=["openalex"])
-    other = make(doi="10.1/a", venue="WRONG", abstract="an abstract", authors=["Other B"],
-                 cited_by_count=99, sources=["inspire"])
+    other = make(
+        doi="10.1/a",
+        venue="WRONG",
+        abstract="an abstract",
+        authors=["Other B"],
+        cited_by_count=99,
+        sources=["inspire"],
+    )
     merge(target, other)
     assert target.venue == "Nature", "an existing value must not be overwritten"
     assert target.authors == ["First A"]
@@ -73,16 +84,24 @@ def test_untitled_works_are_refused():
 
 def test_top_by_citations_ranks():
     corpus = Corpus()
-    corpus.add_all([make(doi="10.1/a", cited_by_count=5, title="A paper"),
-                    make(doi="10.1/b", cited_by_count=50, title="B paper"),
-                    make(doi="10.1/c", cited_by_count=1, title="C paper")])
+    corpus.add_all(
+        [
+            make(doi="10.1/a", cited_by_count=5, title="A paper"),
+            make(doi="10.1/b", cited_by_count=50, title="B paper"),
+            make(doi="10.1/c", cited_by_count=1, title="C paper"),
+        ]
+    )
     assert [w.cited_by_count for w in corpus.top_by_citations(2)] == [50, 5]
 
 
 def test_jsonl_round_trip(tmp_path):
     corpus = Corpus()
-    corpus.add_all([make(doi="10.1/a", authors=["X Y"], sources=["openalex"]),
-                    make(doi="10.1/b", title="Second paper", arxiv_id="2101.00001")])
+    corpus.add_all(
+        [
+            make(doi="10.1/a", authors=["X Y"], sources=["openalex"]),
+            make(doi="10.1/b", title="Second paper", arxiv_id="2101.00001"),
+        ]
+    )
     path = tmp_path / "corpus.jsonl"
     corpus.write_jsonl(path)
     restored = Corpus.read_jsonl(path)
@@ -140,10 +159,16 @@ def test_arxiv_doi_and_published_doi_are_one_paper():
     pair through as two entries, which bibcheck then flagged as a duplicate.
     """
     corpus = Corpus()
-    corpus.add(make(title="Disentangling losses in tantalum superconducting circuits",
-                    doi="10.1103/physrevx.13.041005"))
-    corpus.add(make(title="Disentangling Losses in Tantalum Superconducting Circuits",
-                    doi="10.48550/arxiv.2301.07848", arxiv_id="2301.07848"))
+    corpus.add(
+        make(title="Disentangling losses in tantalum superconducting circuits", doi="10.1103/physrevx.13.041005")
+    )
+    corpus.add(
+        make(
+            title="Disentangling Losses in Tantalum Superconducting Circuits",
+            doi="10.48550/arxiv.2301.07848",
+            arxiv_id="2301.07848",
+        )
+    )
     assert len(corpus) == 1
     assert corpus.works[0].doi == "10.1103/physrevx.13.041005", "the publisher DOI must win"
     assert corpus.works[0].arxiv_id == "2301.07848", "the arXiv id must be carried over"
@@ -172,8 +197,13 @@ def test_seeds_come_from_the_query_hits_not_the_whole_corpus():
 
 def test_a_seed_is_never_expanded_twice():
     corpus = Corpus()
-    corpus.add_all([make(title="Paper A", doi="10.1/a", cited_by_count=50),
-                    make(title="Paper B", doi="10.1/b", cited_by_count=10)], round_index=0)
+    corpus.add_all(
+        [
+            make(title="Paper A", doi="10.1/a", cited_by_count=50),
+            make(title="Paper B", doi="10.1/b", cited_by_count=10),
+        ],
+        round_index=0,
+    )
     first = corpus.seed_candidates(1)
     seen = {id(w) for w in first}
     second = corpus.seed_candidates(1, seen=seen)
@@ -189,8 +219,9 @@ def test_two_publisher_dois_for_one_paper_are_merged():
     corpus = Corpus()
     t = "High-fidelity parametric beamsplitting with a parity-protected converter"
     corpus.add(make(title=t, doi="10.1038/s41467-023-41104-0", year="2023", authors=["B. Chapman"]))
-    corpus.add(make(title=t, doi="10.1038/s41467-023-41822-5", year="2023",
-                    authors=["B. Chapman"], arxiv_id="2303.00959"))
+    corpus.add(
+        make(title=t, doi="10.1038/s41467-023-41822-5", year="2023", authors=["B. Chapman"], arxiv_id="2303.00959")
+    )
     assert len(corpus) == 1
     assert corpus.works[0].arxiv_id == "2303.00959", "the merge must carry the arXiv id over"
 
@@ -235,8 +266,7 @@ def test_an_explicit_seed_is_expanded_even_when_lightly_cited():
     seed = make(title="The seed paper", doi="10.1/seed", cited_by_count=82)
     seed.is_seed = True
     corpus.add(seed)
-    corpus.add_all([make(title=f"Famous review {i}", doi=f"10.1/f{i}", cited_by_count=1000 + i)
-                    for i in range(10)])
+    corpus.add_all([make(title=f"Famous review {i}", doi=f"10.1/f{i}", cited_by_count=1000 + i) for i in range(10)])
     chosen = corpus.seed_candidates(3)
     assert chosen[0].title == "The seed paper", "the named seed must be expanded first"
     assert len(chosen) == 3

@@ -27,15 +27,13 @@ import re
 
 # Words that carry no topical signal. Kept deliberately short: this is a stoplist for
 # query terms, not for prose, so only the words that would match nearly everything.
-STOPWORDS = frozenset(
-    """
+STOPWORDS = frozenset("""
     a an and are as at be by for from has have how in into is it its of on or that the
     their there these this to was were what when where which who why with within without
     using use used via toward towards between across over under more most best better
     new novel recent improved improving high higher low lower long longer large small
     study studies analysis approach method methods result results paper report review
-    """.split()
-)
+    """.split())
 
 TOKEN = re.compile(r"[a-z0-9]+")
 MIN_TERM_LENGTH = 3
@@ -98,7 +96,6 @@ def filter_on_topic(works: list, terms: set[str], min_hits: int = DEFAULT_MIN_TE
 
 RULE_EXCLUDE = "exclude_rule"
 NEEDS_AI = "needs_ai"
-
 
 
 def triage(work, required_any: tuple = (), forbidden_any: tuple = ()) -> tuple[str, str]:

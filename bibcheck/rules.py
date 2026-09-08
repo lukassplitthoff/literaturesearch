@@ -18,14 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from bibcheck.keys import (
-    entry_year,
-    first_author_surname,
-    has_placeholder,
-    latexify,
-    normalize_title,
-    split_authors,
-)
+from bibcheck.keys import entry_year, first_author_surname, has_placeholder, latexify, normalize_title, split_authors
 from bibcheck.parser import ZERO_WIDTH, Database, Entry
 
 # Fields without which the entry is not a usable reference.

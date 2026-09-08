@@ -168,7 +168,10 @@ def test_write_produces_a_readable_file(tmp_path: Path):
 
 def test_zero_width_characters_never_reach_the_output():
     """A BOM pasted before an entry used to survive as a one-character comment block."""
-    source = "\ufeff@Article{k, title = {T}, author = {A, B}, year = {2000}}\n\n\ufeff@article{j, title = {U}, author = {C, D}, year = {2001}}\n"
+    source = (
+        "\ufeff@Article{k, title = {T}, author = {A, B}, year = {2000}}\n\n"
+        "\ufeff@article{j, title = {U}, author = {C, D}, year = {2001}}\n"
+    )
     db = loads(source)
     assert len(db.entries) == 2
     text = dumps(db)

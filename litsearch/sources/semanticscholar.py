@@ -21,6 +21,8 @@ KEY_ENV = "S2_API_KEY"
 def has_key() -> bool:
     """Without a key S2 rate-limits keyless clients to near zero -- see available()."""
     return bool(os.environ.get(KEY_ENV))
+
+
 FIELDS = "paperId,title,year,abstract,authors,externalIds,venue,citationCount,openAccessPdf"
 
 

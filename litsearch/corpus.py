@@ -173,11 +173,7 @@ class Corpus:
         else:
             # No screening yet: fall back to the direct query hits, which the search
             # engines relevance-ranked. Never the whole corpus -- see the docstring.
-            pool = [
-                work
-                for work in self.works
-                if work.found_in_round in from_rounds and id(work) not in seen
-            ]
+            pool = [work for work in self.works if work.found_in_round in from_rounds and id(work) not in seen]
         ranked = sorted(pool, key=lambda w: w.cited_by_count, reverse=True)
         # Explicit seeds are prepended, not merged into the ranking, and de-duplicated
         # against it so one cannot be counted twice.
