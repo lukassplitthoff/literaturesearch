@@ -12,7 +12,7 @@ the next run reads the answers. So a full search is a sequence of invocations:
     #   lit-screener answers screen/verdicts.jsonl
     python <search>.py     # apply verdicts; write overview packets and extraction wave 1
     #   lit-summarizer writes overview/draft.md
-    #   lit-extractor answers extract/rows.jsonl for the wave's papers
+    #   lit-extractor answers extract/rows/<key>.jsonl, one file per paper in the wave
     python <search>.py     # publish overview.md; write evidence.csv and refs.bib
     #   to read further: raise extraction_waves by one and repeat the last two steps
 
@@ -429,7 +429,7 @@ def run(spec: SearchSpec) -> int:
 
     clock.stage("[7/8] extract (full text, in waves)")
     extract_dir = cfg.out_dir / "extract"
-    rows = extract.load_rows(extract_dir / "rows.jsonl")
+    rows = extract.load_all_rows(extract_dir)
     extraction = plan_extraction(included, included_keys, counts["unscreened"], spec, extract_dir, rows)
     coverage = prioritize.write_priority(
         cfg.out_dir / "priority.md",
@@ -483,7 +483,7 @@ def run(spec: SearchSpec) -> int:
     for complaint in complaints[:5]:
         print(f"    [flag] {complaint}")
     if tasks and not rows:
-        print(f"  no rows yet -- answer the tasks into {extract_dir / 'rows.jsonl'}, then re-run")
+        print(f"  no rows yet -- each task's rows go to {extract_dir / extract.ROWS_DIR}/<key>.jsonl, then re-run")
 
     clock.stage("[8/8] write outputs")
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")

@@ -156,9 +156,12 @@ never read it. A pin cannot pull in a paper screening did not include.
 After a wave, show what came back (`evidence.csv`, `conflicts.md`) and ask whether the
 next wave is worth it. If yes, the user -- not you -- raises `extraction_waves` by one.
 
-Delegate to the **lit-extractor** subagent, one task file at a time, with the agreed
-columns. It reads the open-access PDF where `oa_pdf_url` is set and the abstract otherwise, and returns one row per measurement with
-a mandatory `source_quote`.
+Delegate to the **lit-extractor** subagent, one task file per agent, with the agreed
+columns. Each writes its rows to the `rows_file` its task names
+(`extract/rows/<key>.jsonl`), so the agents of a wave can run in parallel. It reads the
+arXiv or open-access PDF where one exists and the abstract otherwise, and returns one row
+per measurement with a mandatory `source_quote`. Record the token count each agent
+reports: per-paper cost is the number that decides whether the next wave is worth it.
 
 Write the rows with `litsearch.export.write_evidence_csv`, which refuses any row whose
 quote is empty. Do not bypass it.

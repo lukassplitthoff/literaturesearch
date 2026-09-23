@@ -87,9 +87,11 @@ read; without it the paper is issued again in the next wave.
 
 ## Boundaries
 
-The **only** file you write is the run's `extract/rows.jsonl`, one JSON object per line,
-appended rather than overwritten. Everything else is read-only. The caller re-checks every
-row and discards any with an empty quote.
+The **only** file you write is the one your task names in `rows_file` --
+`extract/rows/<cite_key>.jsonl` -- one JSON object per line, every row for this paper.
+It is yours alone: other extractors run in parallel on other papers, each with its own
+file, so never write to another paper's file or to a shared one. Everything else is
+read-only. The caller re-checks every row and discards any with an empty quote.
 
 You do not decide whether the paper belongs in the search - that was already decided.
 

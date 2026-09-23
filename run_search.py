@@ -10,7 +10,7 @@ files (nothing here ever calls a model):
     python run_search.py     # retrieve, validate, write screening batches
     #   an agent answers <out>/screen/verdicts.jsonl
     python run_search.py     # apply verdicts; write overview packets and extraction wave 1
-    #   agents write <out>/overview/draft.md and answer <out>/extract/rows.jsonl
+    #   agents write <out>/overview/draft.md and answer <out>/extract/rows/<key>.jsonl
     python run_search.py     # publish overview.md; write evidence.csv and refs.bib
 
 Outputs go to $LITSEARCH_OUT_DIR/<name>/, defaulting to ~/litsearch-runs/<name>/ --

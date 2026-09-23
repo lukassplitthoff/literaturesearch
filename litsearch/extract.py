@@ -91,6 +91,17 @@ def clear_tasks(out_dir: Path) -> None:
         stale.unlink()
 
 
+# Each paper's rows go in their own file. A shared rows.jsonl can only be appended to by
+# reading and rewriting it whole, so extractors running in parallel overwrite each other's
+# rows; one file per paper has one writer. rows.jsonl is still read, for older runs.
+ROWS_DIR = "rows"
+
+
+def rows_file(cite_key: str) -> str:
+    """Where one paper's rows go, relative to the extract directory."""
+    return f"{ROWS_DIR}/{cite_key}.jsonl"
+
+
 def arxiv_pdf_url(arxiv_id: str | None) -> str:
     """The arXiv PDF for an id, or '' when there is none."""
     return f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else ""
@@ -116,6 +127,7 @@ def task_for(work: Work, cite_key: str, schema: tuple[str, ...]) -> dict:
         "has_open_access_pdf": bool(work.oa_pdf_url or work.arxiv_id),
         "abstract": work.abstract or "",
         "schema": list(schema),
+        "rows_file": rows_file(cite_key),
     }
 
 
@@ -221,6 +233,15 @@ def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) ->
             complaints.append(f"{key}: quote does not contain {', '.join(unsupported)}")
         accepted.append(row)
     return accepted, complaints
+
+
+def load_all_rows(extract_dir: Path) -> list[dict]:
+    """Every extracted row of a run: the legacy rows.jsonl, then one file per paper."""
+    extract_dir = Path(extract_dir)
+    rows = load_rows(extract_dir / "rows.jsonl")
+    for path in sorted((extract_dir / ROWS_DIR).glob("*.jsonl")):
+        rows.extend(load_rows(path))
+    return rows
 
 
 def load_rows(path: Path) -> list[dict]:

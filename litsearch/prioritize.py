@@ -22,7 +22,7 @@ not include -- that decision belongs to the screener, not to the queue.
 
 Waves are recorded in ``extract/waves.json`` once issued, so a paper's wave does not move
 when the corpus or the score changes later. A paper counts as answered once any row for
-it is in rows.jsonl, which is why the extractor writes a row even for a paper with nothing
+it is in the run's rows, which is why the extractor writes a row even for a paper with nothing
 to report.
 """
 

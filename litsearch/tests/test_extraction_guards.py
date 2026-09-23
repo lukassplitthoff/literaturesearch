@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from litsearch import extract, prioritize, screen
@@ -210,6 +212,24 @@ def test_a_nothing_found_row_is_neither_evidence_nor_a_complaint():
     rows = [{"cite_key": "A", "T1_us": None, "material": None, "source_quote": "", "note": "no T1 reported"}]
     accepted, complaints = extract.validate_rows(rows, schema=SCHEMA)
     assert (accepted, complaints) == ([], [])
+
+
+def test_each_task_names_its_own_rows_file(tmp_path):
+    """Parallel extractors must never share a file: one rewrite would erase the other's rows."""
+    paths = extract.prepare_tasks(
+        [Work(title="A"), Work(title="B")], tmp_path, schema=SCHEMA, cite_keys={0: "Ann2020", 1: "Bo2021"}
+    )
+    files = [json.loads(p.read_text(encoding="utf-8"))["rows_file"] for p in paths]
+    assert files == ["rows/Ann2020.jsonl", "rows/Bo2021.jsonl"]
+
+
+def test_rows_are_read_from_every_paper_file_and_the_legacy_file(tmp_path):
+    (tmp_path / "rows").mkdir()
+    (tmp_path / "rows" / "Ann2020.jsonl").write_text('{"cite_key": "Ann2020"}\n', encoding="utf-8")
+    (tmp_path / "rows" / "Bo2021.jsonl").write_text('{"cite_key": "Bo2021"}\nnot json\n', encoding="utf-8")
+    (tmp_path / "rows.jsonl").write_text('{"cite_key": "Old2019"}\n', encoding="utf-8")
+    keys = [row["cite_key"] for row in extract.load_all_rows(tmp_path)]
+    assert keys == ["Old2019", "Ann2020", "Bo2021"]
 
 
 def test_the_extractor_is_told_to_always_write_a_row():

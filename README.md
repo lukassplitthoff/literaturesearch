@@ -48,7 +48,7 @@ invocations, because the model-driven stages hand off through files:
 python run_search.py     # retrieve, validate, write screening batches
 #   an agent answers <out>/screen/verdicts.jsonl
 python run_search.py     # apply verdicts; write overview packets and extraction wave 1
-#   an agent writes <out>/overview/draft.md, another answers <out>/extract/rows.jsonl
+#   an agent writes <out>/overview/draft.md; extractors answer <out>/extract/rows/<key>.jsonl
 python run_search.py     # publish overview.md; write evidence.csv and the final refs.bib
 ```
 
