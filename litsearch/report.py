@@ -58,8 +58,17 @@ def write_quarantine(path: Path, verdicts: list[Verdict]) -> int:
     return len(held)
 
 
-def write_shortlist(path: Path, works: list, limit: int = 50, now_year: int | None = None) -> None:
-    """A readable table of what survived the gate, best first.
+def write_shortlist(
+    path: Path, works: list, limit: int = 50, now_year: int | None = None, unscreened: int = 0
+) -> None:
+    """A readable table of the screened-in, validated works, best first.
+
+    ``works`` must be the works screening INCLUDED. This used to be every work that passed
+    the gate, which made it a popularity ranking of the whole snowballed corpus: on a real
+    run its top rows were a mobile-edge-computing survey and an optics review, because the
+    snowball admits highly cited neighbours and citations per year favours them. The gate
+    decides what is real; only screening decides what is relevant. So with screening
+    unfinished there is no shortlist, only a note saying so.
 
     Ordered by citations per year rather than by raw citation count. The raw count is a
     function of age as much as of impact, so sorting on it puts the oldest papers at the
@@ -68,11 +77,23 @@ def write_shortlist(path: Path, works: list, limit: int = 50, now_year: int | No
     disagreed with rather than merely trusted.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    if unscreened or not works:
+        reason = (
+            f"{unscreened} work(s) still have no screening verdict"
+            if unscreened
+            else "screening included no validated work"
+        )
+        path.write_text(
+            f"# Shortlist\n\nNo shortlist: {reason}. Relevance is decided by screening.\n", encoding="utf-8"
+        )
+        return
     ranked = rank.rank(works, now_year=now_year)[:limit]
     lines = [
-        "# Validated shortlist",
+        "# Shortlist",
         "",
-        f"{len(works)} works passed the validation gate; the top {len(ranked)} by citations per year.",
+        f"{len(works)} works were screened in and passed the validation gate; the top {len(ranked)} by "
+        "citations per year. A ranking by attention, not by relevance -- every row already passed "
+        "screening, and priority.md orders the same works for reading in full.",
         "",
         "`Cited here` is how many other works in this corpus cite this one -- a landmark signal",
         "local to this question. It counts only references the search actually fetched, so a zero",
@@ -129,7 +150,7 @@ def load_gold_set(path) -> list[dict]:
     Distinct from ``known_items``, which are titles an earlier run produced and therefore
     only guard against regression. A gold set is chosen by someone who has not seen the
     output, so recall against it is a measurement rather than the system agreeing with
-    itself. Matched on DOI, which is exact -- no fuzzy title comparison to argue about.
+    itself. Matched on DOI, then arXiv id -- both exact, no fuzzy title comparison to argue about.
     """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     return data["papers"] if isinstance(data, dict) else list(data)

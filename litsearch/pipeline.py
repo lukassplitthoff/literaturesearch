@@ -487,7 +487,7 @@ def run(spec: SearchSpec) -> int:
 
     clock.stage("[8/8] write outputs")
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
-    report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
+    report.write_shortlist(cfg.out_dir / "shortlist.md", included, unscreened=counts["unscreened"])
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
     report.write_run_log(cfg.out_dir / "run.json", cfg, corpus, rounds, verdicts, known, gold=gold_result)
     placed = plan.write_reading_plan(

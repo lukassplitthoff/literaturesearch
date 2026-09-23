@@ -455,6 +455,20 @@ def test_gold_recall_matches_on_doi_not_title():
     assert result["recall_pct"] == 50.0
 
 
+def test_the_shortlist_ranks_only_what_it_is_given_and_nothing_before_screening(tmp_path):
+    """The shortlist once ranked every validated work, so the snowball's most-cited
+    neighbours -- off topic, but popular -- topped it."""
+    from litsearch import report
+
+    relevant = Work(title="Floquet analysis of a driven transmon", year="2024", cited_by_count=3)
+    report.write_shortlist(tmp_path / "s.md", [relevant])
+    text = (tmp_path / "s.md").read_text(encoding="utf-8")
+    assert "Floquet analysis of a driven transmon" in text and "1 works were screened in" in text
+
+    report.write_shortlist(tmp_path / "s.md", [relevant], unscreened=4)
+    assert "No shortlist: 4 work(s) still have no screening verdict" in (tmp_path / "s.md").read_text(encoding="utf-8")
+
+
 def test_gold_recall_finds_a_preprint_under_its_journal_doi():
     """The gold set names the arXiv DOI; retrieval kept the published version of the paper."""
     from litsearch import report

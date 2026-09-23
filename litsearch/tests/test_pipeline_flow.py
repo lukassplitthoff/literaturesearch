@@ -101,6 +101,9 @@ def test_the_full_sequence(run_dir, capsys):
     assert "\nDone in " in printed, "a run says when it is over"
     assert task_keys(out) == []
     assert not list(out.glob("overview/packet_*.json"))
+    assert "No shortlist: 25 work(s) still have no screening verdict" in (out / "shortlist.md").read_text(
+        encoding="utf-8"
+    ), "before screening, a shortlist would only rank the snowball by popularity"
 
     # Run 2: everything screened in. Packets for all 25, tasks for wave 1 only.
     include_everything(out)
@@ -112,6 +115,7 @@ def test_the_full_sequence(run_dir, capsys):
     assert len(first_wave) == 20
     priority = (out / "priority.md").read_text(encoding="utf-8")
     assert "Read in full: 0 of 25 screened-in papers." in priority
+    assert "25 works were screened in" in (out / "shortlist.md").read_text(encoding="utf-8")
 
     # Run 3: the summarizer wrote a draft that obeys the rules. It is published.
     entry = packet_works(out)[0]
