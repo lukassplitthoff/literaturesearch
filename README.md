@@ -50,6 +50,11 @@ python run_search.py     # apply verdicts, write extraction tasks
 python run_search.py     # write evidence.csv and the final refs.bib
 ```
 
+Extraction is the expensive stage -- every task is a full paper read -- so the second
+invocation writes **no** extraction tasks unless all three hold: every work that needed a
+screening verdict has one, `extraction_schema` names at least one column, and no more than
+`max_extraction_tasks` (default 60) works are screened in. It prints which one failed.
+
 Inside Claude Code, `/litsearch "<your question>"` drives all three and fills in the
 agent steps for you. Outputs go to `$LITSEARCH_OUT_DIR/<name>/`, default
 `~/litsearch-runs/<name>/` -- outside the repository, because run results are data.
@@ -87,8 +92,9 @@ domain expert before any run, which does not exist yet.
 
 ## litsearch design
 
-A question, hypothesis or topic goes in; a validated corpus plus an evidence table and a
-synthesis come out. Eight stages, with deterministic Python and the language model kept
+A question, hypothesis or topic goes in; a validated corpus, a screened evidence set and a
+structured evidence table come out. Any written synthesis is built from those files
+afterwards -- never by re-reading or summarising the papers. Eight stages, with deterministic Python and the language model kept
 strictly apart -- Python does HTTP, dedup, caching and validation and contains no model call;
 Claude does language work and never touches HTTP. Every stage boundary is a file on disk, so
 any stage can be re-run or inspected alone.

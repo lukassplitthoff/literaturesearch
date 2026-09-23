@@ -56,7 +56,12 @@ SPEC = SearchSpec(
     screen_forbidden=(),
     screen_required=(),
     # Stage 6 columns. Every one must be quotable from the paper or it is recorded null.
+    # Required: left empty, stage 6 writes no tasks -- extraction fills columns, it does not
+    # summarise papers.
     extraction_schema=(),
+    # Stage 6 refuses to write more tasks than this; each task is one full paper read. If it
+    # trips, tighten the inclusion criteria first and raise this only if the count is right.
+    max_extraction_tasks=60,
     mailto="",  # your address puts Crossref/OpenAlex requests in the polite pool
 )
 

@@ -95,6 +95,16 @@ short and is where the interesting edge cases live.
 
 ### Stage 6 - Extract
 
+This is the expensive stage: every task is an Opus subagent reading one whole paper.
+`run_search.py` writes tasks to `extract/` only when screening is complete, the
+extraction schema is non-empty and the included count is within `max_extraction_tasks`;
+otherwise it prints `[BLOCKED]` with the reason and writes none. **Never work around a
+block** -- do not write task files yourself, do not raise the limit on your own, and do not
+read the papers directly instead. Fix the cause (finish screening, agree the columns with
+the user, tighten the criteria), or put the count to the user and let them raise the limit.
+
+Before starting, tell the user how many tasks there are and which columns they fill.
+
 Delegate to the **lit-extractor** subagent, one work at a time, for works that were
 included AND verified. Give it the agreed columns. It reads the open-access PDF where
 `oa_pdf_url` is set and the abstract otherwise, and returns one row per measurement with
@@ -138,6 +148,16 @@ Exit code 0 or 1 is fine; 2 means the bibliography has errors and is not finishe
 Tell the user plainly: how many works were retrieved, how many survived the gate, how
 many are quarantined and why, and which known items were missed. If retrieval looked
 thin, say so rather than presenting a short list as a complete answer.
+
+## "Summarise these papers"
+
+This pipeline has no summarise stage, and a request to summarise the whole corpus is the
+single most expensive way to use it: hundreds of full-paper reads that produce nothing
+checkable. Do not do it. Answer with what already exists instead -- `reading_plan.md`
+for "what is in here and where do I start", `shortlist.md` for "what survived", and
+`evidence.csv` plus `conflicts.md` for "what do they report". If the user wants something
+specific from every paper, that is an extraction column: agree it, and extract from the
+screened-in set only.
 
 ## Follow-up questions
 

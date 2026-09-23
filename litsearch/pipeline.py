@@ -78,8 +78,11 @@ class SearchSpec:
     # clinical search wants "rct" and "cohort" where a physics one wants "primary".
     roles: tuple[str, ...] = screen.ROLES
 
-    # Stage 6 columns. Each must be quotable from the paper or it is recorded null.
+    # Stage 6 columns. Each must be quotable from the paper or it is recorded null. Required:
+    # with none, stage 6 writes no tasks.
     extraction_schema: tuple[str, ...] = ()
+    # Stage 6 refuses to write more tasks than this. Each task is a full paper read.
+    max_extraction_tasks: int = extract.DEFAULT_MAX_TASKS
 
     mailto: str = ""
     offline: bool = False
@@ -101,6 +104,28 @@ class SearchSpec:
             out_dir=run_dir(self.name),
             offline=self.offline,
         )
+
+
+def select_for_extraction(corpus, counts: dict[str, int], spec: SearchSpec) -> tuple[list, list[str]]:
+    """The works stage 6 may read, and the reasons it may not run at all.
+
+    Only works that both passed the gate and were screened in are candidates. There is
+    deliberately no fallback to "every validated work" when screening has not happened:
+    that fallback once turned a run with no verdicts into hundreds of full-paper reads.
+
+    Args:
+        corpus: the screened corpus.
+        counts: the verdict counts returned by ``screen.apply_verdicts``.
+        spec: the search, for its extraction schema and task limit.
+
+    Returns:
+        (candidates, blockers). Tasks are written only when ``blockers`` is empty.
+    """
+    candidates = [work for work in screen.included(corpus) if work.validation == "verified"]
+    blockers = extract.extraction_blockers(
+        len(candidates), counts["unscreened"], spec.extraction_schema, spec.max_extraction_tasks
+    )
+    return candidates, blockers
 
 
 def run(spec: SearchSpec) -> int:
@@ -187,11 +212,7 @@ def run(spec: SearchSpec) -> int:
     review_queue = screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
 
     print("\n[6/7] extract")
-    # Only works that BOTH passed the gate and were screened in are worth reading.
-    included = [work for work in screen.included(corpus) if work.validation == "verified"]
-    if not included and counts["unscreened"] + counts["by_rule"] == len(corpus):
-        included = passed
-        print("  no screening verdicts yet; preparing tasks for every validated work")
+    included, blockers = select_for_extraction(corpus, counts, spec)
     extract_dir = cfg.out_dir / "extract"
     # The works that will be rendered into refs.bib, and the keys they will carry there.
     # Extraction is given those keys so that evidence.csv can be joined to the bibliography
@@ -199,20 +220,27 @@ def run(spec: SearchSpec) -> int:
     # be handed placeholders like work007 instead.
     bib_works = included or passed
     cite_keys = export.cite_keys_for(bib_works)
-    tasks = extract.prepare_tasks(
-        included,
-        extract_dir,
-        schema=spec.extraction_schema,
-        cite_keys=cite_keys if included else None,
-    )
+    print(f"  {len(included)} work(s) screened in and verified (limit {spec.max_extraction_tasks})")
+    if blockers:
+        extract.clear_tasks(extract_dir)
+        tasks = []
+        print("  [BLOCKED] no extraction tasks written:")
+        for reason in blockers:
+            print(f"    - {reason}")
+    else:
+        tasks = extract.prepare_tasks(included, extract_dir, schema=spec.extraction_schema, cite_keys=cite_keys)
+        print(
+            f"  {len(tasks)} extraction task(s) x {len(spec.extraction_schema)} field(s); "
+            f"each task is one extractor reading one full paper"
+        )
     rows = extract.load_rows(extract_dir / "rows.jsonl")
     accepted, complaints = extract.validate_rows(rows, schema=spec.extraction_schema)
-    print(f"  {len(tasks)} extraction tasks, {len(accepted)}/{len(rows)} rows accepted")
+    print(f"  {len(accepted)}/{len(rows)} rows accepted")
     if complaints:
         print(f"  {len(complaints)} row(s) flagged for review (kept, but the quote is weak):")
     for complaint in complaints[:5]:
         print(f"    [flag] {complaint}")
-    if not rows:
+    if tasks and not rows:
         print(f"  no rows yet -- answer the tasks into {extract_dir / 'rows.jsonl'}, then re-run")
 
     print("\n[7/7] write outputs")

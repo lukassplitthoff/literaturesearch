@@ -62,7 +62,9 @@ yields three rows.
 
 `litsearch.export.write_evidence_csv` drops any row with an empty quote, and
 `litsearch.extract.validate_rows` flags any row whose quote does not contain the digits of
-the value it claims. Do not bypass either.
+the value it claims. Do not bypass either. Neither proves the quote is *about* that
+quantity -- "operated at 20 mK" passes for a T1 of 20 -- so a flagged row, and any row a
+claim leans on, still needs a reader.
 
 ## `reading_plan.md` -- where to start
 

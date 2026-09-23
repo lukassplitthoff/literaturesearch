@@ -1,12 +1,14 @@
 """Stage 6: evidence extraction.
 
 Same shape as screening: this package writes one task file per paper and reads rows back,
-so the model stays outside the deterministic code. The difference is the guarantee --
-every returned value must carry the sentence it came from, and this module enforces that
-on the way in rather than trusting the extractor to have obeyed.
+so the model stays outside the deterministic code. The difference is the contract --
+every returned value must carry the sentence it came from.
 
-A row whose ``source_quote`` is empty is dropped and counted. A row whose quote does not
-actually contain the value it claims is flagged. Neither is silently accepted.
+What this module can check on the way in is narrower than that contract: a quote is
+present, and it contains the digits of the value it claims. A row whose ``source_quote``
+is empty is dropped and counted; a row whose quote lacks the value's digits is flagged.
+It cannot prove the quote is about that quantity -- "operated at 20 mK" passes for a
+T1 of 20 -- nor that a unit conversion was done right. That still needs a reader.
 """
 
 from __future__ import annotations
@@ -39,7 +41,52 @@ DEFAULT_SCHEMA = (
     "temperature_mK",
 )
 
+# Stage 6 is the one expensive stage: every task is an extractor reading one whole paper.
+# Past this many tasks the run refuses to write them. The largest deliberate extraction so
+# far was 46 papers; a count in the hundreds has only ever meant that screening had not
+# happened. A search that genuinely needs more raises max_extraction_tasks on its SearchSpec.
+DEFAULT_MAX_TASKS = 60
+
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def extraction_blockers(candidates: int, unscreened: int, schema: tuple[str, ...], max_tasks: int) -> list[str]:
+    """Why stage 6 must not write tasks yet. An empty list means it may.
+
+    Extraction reads the papers screening has already chosen; it is never the step that
+    discovers which papers are worth reading. So it fails closed: an incomplete screen, an
+    empty schema or an implausibly large task count each stop it, rather than letting the
+    expensive stage run on whatever happens to be lying around.
+
+    Args:
+        candidates: works that were screened in and passed the gate.
+        unscreened: works that needed a model verdict and have none.
+        schema: the columns to extract.
+        max_tasks: the largest number of tasks allowed without raising the limit.
+    """
+    blockers = []
+    if unscreened:
+        blockers.append(
+            f"{unscreened} work(s) have no screening verdict. Extraction only reads works screening "
+            f"has included -- finish screening first"
+        )
+    if not schema:
+        blockers.append(
+            "extraction_schema is empty. Extraction fills declared columns; it does not read or "
+            "summarise papers without them"
+        )
+    if candidates > max_tasks:
+        blockers.append(
+            f"{candidates} works are screened in, above max_extraction_tasks={max_tasks}. Tighten the "
+            f"inclusion criteria, or raise the limit on the SearchSpec if this many is intended"
+        )
+    return blockers
+
+
+def clear_tasks(out_dir: Path) -> None:
+    """Delete task files from a previous run, so a stale task is never answered."""
+    for stale in Path(out_dir).glob("task_*.json"):
+        stale.unlink()
 
 
 def arxiv_pdf_url(arxiv_id: str | None) -> str:
@@ -76,11 +123,17 @@ def prepare_tasks(
     schema: tuple[str, ...] = DEFAULT_SCHEMA,
     cite_keys: dict[int, str] | None = None,
 ) -> list[Path]:
-    """Write one task file per work. Returns the paths written."""
+    """Write one task file per work. Returns the paths written.
+
+    Raises:
+        ValueError: if ``schema`` is empty -- a task with no columns asks for a full read
+            that yields nothing checkable.
+    """
+    if not schema:
+        raise ValueError("extraction schema is empty; declare the columns to extract")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    for stale in out_dir.glob("task_*.json"):
-        stale.unlink()
+    clear_tasks(out_dir)
 
     paths = []
     for index, work in enumerate(works):
@@ -136,7 +189,7 @@ def _quote_supports(value, quote: str) -> bool:
 
 
 def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) -> tuple[list[dict], list[str]]:
-    """Enforce the quote guarantee. Returns (accepted rows, complaints).
+    """Check quote presence and numeric consistency. Returns (accepted rows, complaints).
 
     Two different outcomes, deliberately: a row with NO quote is dropped, because a value
     nobody can quote is not evidence. A row whose quote does not obviously contain the
