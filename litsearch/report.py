@@ -137,13 +137,18 @@ def load_gold_set(path) -> list[dict]:
 
 def gold_recall(corpus, gold: list[dict]) -> dict:
     """Which gold papers the corpus contains, and what happened to each."""
-    from litsearch.sources.base import clean_doi
+    from litsearch.sources.base import clean_arxiv_id, clean_doi
 
     by_doi = {work.doi: work for work in corpus.works if work.doi}
+    # A preprint and its journal version are one paper with two DOIs, and dedup keeps the
+    # journal one. The arXiv id survives the merge, so it is the second exact key: without
+    # it, a gold preprint that retrieval found as its published version counts as missed.
+    by_arxiv = {work.arxiv_id: work for work in corpus.works if work.arxiv_id}
     rows = []
     for paper in gold:
         doi = clean_doi(paper.get("doi"))
-        work = by_doi.get(doi)
+        arxiv_id = clean_arxiv_id(paper.get("arxiv") or doi)
+        work = by_doi.get(doi) or (by_arxiv.get(arxiv_id) if arxiv_id else None)
         rows.append(
             {
                 "key": paper.get("key", doi),

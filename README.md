@@ -38,6 +38,9 @@ cleaned *copy* when you ask it to with `--out-dir`, never in place.
 search with its numbers, and it is shorter than this README:
 
 - [examples/parametric_gates_bosonic_cavities/](examples/parametric_gates_bosonic_cavities/README.md)
+- [examples/floquet_cqed/](examples/floquet_cqed/README.md) -- Floquet simulation of strongly driven
+  cQED devices; the first run through the overview and extraction waves, including what
+  the checks caught
 
 Then copy `run_search.py`, edit the `SearchSpec`, and run it. A full search is several
 invocations, because the model-driven stages hand off through files:

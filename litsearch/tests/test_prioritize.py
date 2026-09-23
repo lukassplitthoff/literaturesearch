@@ -47,6 +47,30 @@ def test_a_primary_paper_naming_the_columns_ranks_first():
     assert rows[0]["role_points"] == 3 and rows[0]["terms"] == ["echo", "t1", "t2"]
 
 
+def test_a_methods_question_can_put_theory_first():
+    works = [
+        work("A measurement", "We measure T1.", role="primary"),
+        work("A Floquet theory", "A Floquet-Markov treatment of the driven transmon.", role="theory"),
+    ]
+    rows = prioritize.score_works(
+        works,
+        keys_for(works),
+        ("T1_us",),
+        role_points={"theory": 3, "primary": 1},
+        terms={"floquet", "markov"},
+    )
+    assert [row["key"] for row in rows] == ["K1", "K0"]
+    assert rows[0]["terms"] == ["floquet", "markov"]
+
+
+def test_the_overrides_are_stated_in_priority_md(tmp_path):
+    prioritize.write_priority(
+        tmp_path / "p.md", [], [], set(), set(), ("T1_us",), role_points={"theory": 3}, terms={"floquet"}
+    )
+    text = (tmp_path / "p.md").read_text(encoding="utf-8")
+    assert "role points (theory 3)" in text and "Terms searched for: floquet." in text
+
+
 def test_term_points_are_capped():
     works = [work("Everything", "t1 t2 echo fidelity temperature gate", role="review")]
     rows = prioritize.score_works(works, keys_for(works), ("T1_us", "T2_us", "echo", "fidelity", "temperature_mK"))

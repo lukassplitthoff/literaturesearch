@@ -21,6 +21,7 @@ Re-running is cheap: every index response is cached on disk.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -102,6 +103,12 @@ class SearchSpec:
     extraction_waves: int = 1
     # Stage 6 refuses to issue more papers than this in total. Each is a full paper read.
     max_extraction_tasks: int = extract.DEFAULT_MAX_TASKS
+    # How priority.md ranks papers for the waves. None keeps the defaults, which suit a
+    # "what was measured" question: experiments first, terms from the column names. A
+    # question about methods or theory should put "theory" and "method" first instead, and
+    # name the terms that mark the papers worth reading in full.
+    priority_role_points: dict[str, int] | None = None
+    priority_terms: tuple[str, ...] | None = None
 
     # Stage 4b, the abstract-level overview of every screened-in paper. `summary_focus` is
     # the angle it takes ("which materials, and what limits T1"); empty describes the set.
@@ -243,7 +250,14 @@ def plan_extraction(
     # A selection can only reorder or drop screened-in papers; it cannot pull one in.
     ignored = [key for key in list(pinned) + sorted(skipped) if key not in candidates]
     pinned = [key for key in pinned if key in candidates]
-    ranked = prioritize.score_works(included, cite_keys, spec.extraction_schema, pinned)
+    ranked = prioritize.score_works(
+        included,
+        cite_keys,
+        spec.extraction_schema,
+        pinned,
+        role_points=spec.priority_role_points,
+        terms=set(spec.priority_terms) if spec.priority_terms is not None else None,
+    )
     waves = prioritize.plan_waves(
         [row["key"] for row in ranked],
         prioritize.load_waves(extract_dir / "waves.json"),
@@ -267,6 +281,38 @@ def plan_extraction(
     )
 
 
+def _duration(seconds: float) -> str:
+    minutes, rest = divmod(int(round(seconds)), 60)
+    return f"{minutes}m{rest:02d}s" if minutes else f"{rest}s"
+
+
+class StageClock:
+    """Prints each stage header, and how long the previous stage took.
+
+    A full run is several minutes of throttled requests. The stage timings say where
+    those minutes went, and the closing line says the run is over -- rather than leaving
+    the last stage's output to be mistaken for a run still in progress.
+    """
+
+    def __init__(self) -> None:
+        self.started = self.lap = time.monotonic()
+
+    def _close_stage(self) -> None:
+        now = time.monotonic()
+        print(f"  ({_duration(now - self.lap)})")
+        self.lap = now
+
+    def stage(self, header: str, first: bool = False) -> None:
+        if not first:
+            self._close_stage()
+            print()
+        print(header)
+
+    def finish(self, outcome: str) -> None:
+        self._close_stage()
+        print(f"\nDone in {_duration(time.monotonic() - self.started)} -- {outcome}")
+
+
 def run(spec: SearchSpec) -> int:
     """Run every stage. Returns 0, or 1 when a known item was not found."""
     cfg = spec.to_config()
@@ -279,40 +325,32 @@ def run(spec: SearchSpec) -> int:
     print(f"question: {cfg.question}")
     print(f"output  : {cfg.out_dir}  (override with ${OUT_DIR_ENV})\n")
 
-    print("[1/8] retrieve")
+    clock = StageClock()
+    clock.stage("[1/8] retrieve", first=True)
     corpus = retrieve.run(fetcher, cfg)
     fetcher.save_cache()  # flush before each long stage, so an interrupt costs nothing
 
-    print("\n[2/8] snowball")
+    clock.stage("[2/8] snowball")
     rounds = snowball.expand(fetcher, corpus, cfg)
     fetcher.save_cache()
 
-    print("\n[3/8] validate (the gate)")
+    clock.stage("[3/8] validate (the gate)")
     client = IndexClient(cache_path=cfg.cache_path, mailto=cfg.mailto, offline=cfg.offline)
     passed, verdicts = validate_all(corpus.works, client)
     fetcher.save_cache()
     print(f"  {len(passed)} verified, {len(verdicts) - len(passed)} quarantined")
 
-    print("\n[4/8] known-item check")
+    clock.stage("[4/8] known-item check")
     known = report.known_item_results(corpus, cfg.known_items)
     for row in known:
         mark = "OK  " if row["found"] else "MISS"
         print(f"  [{mark}] {row['wanted'][:62]} (similarity {row['similarity']})")
     if not known:
         print("  known items: (none configured)")
-
-    gold_result = None
     if spec.gold_set:
-        gold_result = report.gold_recall(corpus, report.load_gold_set(spec.gold_set))
-        print(
-            f"  gold set: {gold_result['found']}/{gold_result['total']} found "
-            f"({gold_result['recall_pct']}% recall)"
-        )
-        for row in gold_result["rows"]:
-            mark = "OK  " if row["found"] else "MISS"
-            print(f"    [{mark}] {row['key']:30s} {row['screen']}")
+        print("  gold set: checked after screening, so each paper's verdict is its current one")
 
-    print("\n[5/8] screen")
+    clock.stage("[5/8] screen")
     screen_dir = cfg.out_dir / "screen"
     to_model, rule_excluded = relevance.triage_all(corpus.works, spec.screen_required, spec.screen_forbidden)
     print(f"  triage: {len(rule_excluded)} excluded by rule, {len(to_model)} need the model")
@@ -350,6 +388,25 @@ def run(spec: SearchSpec) -> int:
             print(f"  roles on {counts['roled']}/{screened} screened work(s)")
     review_queue = screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
 
+    # The gold set is reported here, after the verdicts are applied, not with the known
+    # items: its status column is the screening verdict, and read before screening it said
+    # "unscreened" for every paper -- hiding a gold paper the screener had excluded.
+    gold_result = None
+    if spec.gold_set:
+        gold_result = report.gold_recall(corpus, report.load_gold_set(spec.gold_set))
+        print(
+            f"  gold set: {gold_result['found']}/{gold_result['total']} found "
+            f"({gold_result['recall_pct']}% recall)"
+        )
+        for row in gold_result["rows"]:
+            mark = "OK  " if row["found"] else "MISS"
+            print(f"    [{mark}] {row['key']:30s} {row['screen']}")
+        if gold_result["found_but_screened_out"]:
+            print(
+                f"  [WARN] gold paper(s) found but not screened in: "
+                f"{', '.join(gold_result['found_but_screened_out'])} -- check the criteria against them"
+            )
+
     # The works that will be rendered into refs.bib, and the keys they will carry there.
     # The overview and extraction are given those keys so that both can be joined to the
     # bibliography -- the output contract requires every cite_key to name a real entry, and
@@ -359,7 +416,7 @@ def run(spec: SearchSpec) -> int:
     cite_keys = export.cite_keys_for(bib_works)
     included_keys = cite_keys if included else {}
 
-    print("\n[6/8] overview (abstract level)")
+    clock.stage("[6/8] overview (abstract level)")
     run_overview(
         cfg.out_dir,
         spec,
@@ -370,7 +427,7 @@ def run(spec: SearchSpec) -> int:
         len(verdicts) - len(passed),
     )
 
-    print("\n[7/8] extract (full text, in waves)")
+    clock.stage("[7/8] extract (full text, in waves)")
     extract_dir = cfg.out_dir / "extract"
     rows = extract.load_rows(extract_dir / "rows.jsonl")
     extraction = plan_extraction(included, included_keys, counts["unscreened"], spec, extract_dir, rows)
@@ -382,6 +439,8 @@ def run(spec: SearchSpec) -> int:
         extraction.skipped,
         spec.extraction_schema,
         extraction.blockers,
+        role_points=spec.priority_role_points,
+        terms=set(spec.priority_terms) if spec.priority_terms is not None else None,
     )
     print(
         f"  {len(included)} work(s) screened in and verified; waves of {spec.extraction_wave_size}, "
@@ -426,7 +485,7 @@ def run(spec: SearchSpec) -> int:
     if tasks and not rows:
         print(f"  no rows yet -- answer the tasks into {extract_dir / 'rows.jsonl'}, then re-run")
 
-    print("\n[8/8] write outputs")
+    clock.stage("[8/8] write outputs")
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)
@@ -469,5 +528,7 @@ def run(spec: SearchSpec) -> int:
     missed = [row for row in known if not row["found"]]
     if missed:
         print(f"\nWARNING: {len(missed)} known-item(s) not found -- retrieval is incomplete")
+        clock.finish(f"{len(missed)} known item(s) missed")
         return 1
+    clock.finish(f"outputs in {cfg.out_dir}")
     return 0

@@ -85,7 +85,8 @@ def from_seed_dois(fetcher: Fetcher, dois: tuple[str, ...]) -> list:
         work = openalex.to_work(results[0])
         work.is_seed = True
         works.append(work)
-        print(f"  seed: {work.title[:66]} ({work.cited_by_count} citations, {len(work.references)} refs)")
+        title = work.title[:66].encode("ascii", "replace").decode("ascii")
+        print(f"  seed: {title} ({work.cited_by_count} citations, {len(work.references)} refs)")
     return works
 
 

@@ -115,6 +115,19 @@ def test_quote_matching_ignores_case_and_whitespace():
     assert overview.check_draft(draft, ABSTRACTS) == []
 
 
+def test_stray_markup_under_a_cited_paragraph_is_refused():
+    """A real draft ended with tool markup glued to its last paragraph; the citation rule
+    alone could not see it, because the paragraph around it was cited."""
+    draft = "Tantalum recurs [@Place2021].\n</content>\n</invoke>\n"
+    problems = overview.check_draft(draft, ABSTRACTS)
+    assert sum("stray markup" in p for p in problems) == 2
+
+
+def test_inline_angle_brackets_in_prose_are_not_markup():
+    draft = "Coupling g < chi in the regime of interest [@Place2021].\n"
+    assert overview.check_draft(draft, ABSTRACTS) == []
+
+
 def test_tables_are_refused():
     assert any("table" in p for p in overview.check_draft("| a | b |\n", ABSTRACTS))
 

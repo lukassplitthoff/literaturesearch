@@ -455,6 +455,17 @@ def test_gold_recall_matches_on_doi_not_title():
     assert result["recall_pct"] == 50.0
 
 
+def test_gold_recall_finds_a_preprint_under_its_journal_doi():
+    """The gold set names the arXiv DOI; retrieval kept the published version of the paper."""
+    from litsearch import report
+
+    corpus = Corpus()
+    corpus.add(Work(title="Linear coupler", doi="10.1103/7rnm-rxhh", arxiv_id="2501.18025"))
+    by_arxiv_doi = report.gold_recall(corpus, [{"key": "a", "doi": "10.48550/arXiv.2501.18025"}])
+    by_arxiv_key = report.gold_recall(corpus, [{"key": "a", "doi": "10.1/other", "arxiv": "2501.18025"}])
+    assert by_arxiv_doi["found"] == 1 and by_arxiv_key["found"] == 1
+
+
 def test_gold_recall_separates_not_found_from_screened_out():
     """A paper found but screened out is a different failure from one never retrieved,
     and conflating them hides which half of the pipeline needs work."""

@@ -1,0 +1,25 @@
+{
+  "name": "Floquet and Floquet-Markov simulation of strongly driven cQED devices",
+  "provenance": "Named by Lukas Splitthoff as the three references that cover Floquet / Floquet-Markov simulation of strongly driven cQED devices and couplers, before any run of this search was seen. Given as arXiv ids; titles and authors below were resolved by the pipeline's own OpenAlex lookup, not written from memory.",
+  "why_this_matters": "These are deliberately NOT seed_dois. OpenAlex holds no references and no citers for any of the three arXiv records, so seeding from them would expand nothing -- and seeding would also make recall against them trivially 100%. Kept as a gold set, they measure whether the queries alone find this literature.",
+  "papers": [
+    {
+      "key": "You2026",
+      "doi": "10.48550/arxiv.2609.04704",
+      "arxiv": "2609.04704",
+      "title": "Strong-Drive Limits in Josephson Circuits: From Chaos to an Unbound-Resonance Threshold"
+    },
+    {
+      "key": "Ma2025",
+      "doi": "10.48550/arxiv.2511.05031",
+      "arxiv": "2511.05031",
+      "title": "Frequency collisions in parametrically modulated superconducting circuits"
+    },
+    {
+      "key": "Maiti2025",
+      "doi": "10.48550/arxiv.2501.18025",
+      "arxiv": "2501.18025",
+      "title": "A Linear Quantum Coupler for Clean Bosonic Control"
+    }
+  ]
+}

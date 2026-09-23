@@ -55,6 +55,7 @@ _QUOTED = re.compile(r'"[^"]*"')
 # A number standing on its own: not the digit in "T1", "3D" or "2x", and not a year.
 _BARE_NUMBER = re.compile(r"(?<![A-Za-z0-9_.])\d+(?:[.,]\d+)?(?![A-Za-z0-9_])")
 _YEAR = re.compile(r"^(19|20)\d\d$")
+_MARKUP_LINE = re.compile(r"^</?[A-Za-z][\w:.-]*(?:\s[^<>]*)?/?>$")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 # Curly quotes, written as code points so this file stays ASCII.
 _TYPOGRAPHIC = str.maketrans({chr(0x201C): '"', chr(0x201D): '"', chr(0x2018): "'", chr(0x2019): "'"})
@@ -174,6 +175,13 @@ def check_draft(text: str, abstracts: dict[str, str]) -> list[str]:
     if not text.strip():
         return ["the draft is empty"]
     normalised = {key: _normalise(abstract) for key, abstract in abstracts.items()}
+    # A line that is nothing but a tag is leftover markup from the writing tool, not
+    # prose. It hides from the citation rule when it sits directly under a cited
+    # paragraph, because the two are read as one block -- a real draft shipped with
+    # "</content>" appended that way.
+    for line in text.splitlines():
+        if _MARKUP_LINE.match(line.strip()):
+            problems.append(f"stray markup line, not prose: {line.strip()[:40]}")
     for block in _blocks(text):
         preview = block[:70]
         if block.lstrip().startswith("|"):

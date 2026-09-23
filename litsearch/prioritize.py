@@ -39,6 +39,9 @@ from litsearch.sources.base import Work
 
 DEFAULT_WAVE_SIZE = 20
 
+# The default suits the usual question -- "what was measured" -- where a paper reporting
+# its own measurement is the one to read. A question about methods wants the opposite
+# order, so a search overrides this with SearchSpec.priority_role_points.
 ROLE_POINTS = {"primary": 3, "method": 1, "": 1, "review": 0, "theory": 0}
 
 # The schema term count is capped so that a long abstract mentioning every column once
@@ -99,14 +102,21 @@ def score_works(
     schema: tuple[str, ...],
     pinned: list[str] = (),
     now_year: int | None = None,
+    role_points: dict[str, int] | None = None,
+    terms: set[str] | None = None,
 ) -> list[dict]:
     """One row per keyed work, best first, with the parts of its score.
 
     Works without a cite key are uncitable and absent from refs.bib, so they are not
     ranked -- an extracted row for them could never be joined to the bibliography.
+
+    ``role_points`` and ``terms`` override the defaults: ROLE_POINTS, and the subject words
+    of the extraction columns. Column names are a weak source of terms for some schemas --
+    "compared_to_experiment" contributes "compared", which every abstract matches.
     """
     now_year = now_year or date.today().year
-    terms = schema_terms(schema)
+    role_points = ROLE_POINTS if role_points is None else role_points
+    terms = schema_terms(schema) if terms is None else {term.lower() for term in terms}
     local = rank.in_corpus_citations(works)
     pin_order = {key: position for position, key in enumerate(pinned)}
     rows = []
@@ -115,7 +125,7 @@ def score_works(
         if not key:
             continue
         found = sorted(set(TOKEN.findall(f"{work.title} {work.abstract}".lower())) & terms)
-        role_points = ROLE_POINTS.get(work.role, 0)
+        points_for_role = role_points.get(work.role, 0)
         term_points = min(len(found), MAX_TERM_POINTS)
         rows.append(
             {
@@ -125,9 +135,9 @@ def score_works(
                 "year": rank.year_of(work),
                 "role": work.role or "unclassified",
                 "terms": found,
-                "role_points": role_points,
+                "role_points": points_for_role,
                 "term_points": term_points,
-                "score": role_points + term_points,
+                "score": points_for_role + term_points,
                 "pinned": key in pin_order,
                 "citations_per_year": round(rank.citations_per_year(work, now_year), 2),
                 "in_corpus_citations": local[position],
@@ -208,6 +218,8 @@ def write_priority(
     skipped: set[str],
     schema: tuple[str, ...],
     blockers: list[str] = (),
+    role_points: dict[str, int] | None = None,
+    terms: set[str] | None = None,
 ) -> dict[str, int]:
     """Write priority.md: the queue, each paper's wave and status, and why it sits there.
 
@@ -229,11 +241,14 @@ def write_priority(
     ]
     if blockers:
         lines += ["**Extraction is blocked:**", ""] + [f"- {reason}" for reason in blockers] + [""]
+    role_points = ROLE_POINTS if role_points is None else role_points
+    terms = schema_terms(schema) if terms is None else {term.lower() for term in terms}
+    roles_text = ", ".join(f"{role or 'unclassified'} {points}" for role, points in role_points.items())
     lines += [
         "Order: pinned papers first (`+Key` in extract/selection.txt), then by score, then by",
-        "citations per year. Score = role points (primary 3, method or unclassified 1, review or",
-        f"theory 0) + extraction-column terms named in the title or abstract (at most {MAX_TERM_POINTS}).",
-        f"Columns searched for: {', '.join(sorted(schema_terms(schema))) or '(none)'}.",
+        f"citations per year. Score = role points ({roles_text}) + terms named in the title or",
+        f"abstract (at most {MAX_TERM_POINTS}).",
+        f"Terms searched for: {', '.join(sorted(terms)) or '(none)'}.",
         "",
         "The score is a heuristic over metadata and the screener's role label. It says which",
         "papers are likeliest to state the numbers, not which are best or most relevant.",

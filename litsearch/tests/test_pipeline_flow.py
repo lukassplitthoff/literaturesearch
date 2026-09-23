@@ -98,6 +98,7 @@ def test_the_full_sequence(run_dir, capsys):
     printed = capsys.readouterr().out
     assert "[6/8] overview" in printed and "[7/8] extract" in printed
     assert printed.count("[BLOCKED]") == 2
+    assert "\nDone in " in printed, "a run says when it is over"
     assert task_keys(out) == []
     assert not list(out.glob("overview/packet_*.json"))
 

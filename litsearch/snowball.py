@@ -63,7 +63,8 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
         print(f"  seeding from {basis}")
         expanded.update(id(seed) for seed in seeds)
         harvested = []
-        for seed in seeds:
+        for number, seed in enumerate(seeds, start=1):
+            before = len(harvested)
             oid = seed.source_ids.get(openalex.NAME)
             if oid:
                 harvested.extend(openalex.cited_by(fetcher, oid, limit=cfg.per_query_limit))
@@ -74,6 +75,10 @@ def expand(fetcher: Fetcher, corpus: Corpus, cfg: SearchConfig) -> list[RoundSta
             pid = seed.source_ids.get(semanticscholar.NAME)
             if pid and semanticscholar.NAME in cfg.sources:
                 harvested.extend(semanticscholar.references(fetcher, pid))
+            # One line per seed: a round is minutes of throttled requests, and without
+            # this it is minutes of silence. Titles are forced to ASCII for cp1252 consoles.
+            title = seed.title[:50].encode("ascii", "replace").decode("ascii")
+            print(f"    seed {number}/{len(seeds)}: {title} -> {len(harvested) - before} works")
 
         harvested = [w for w in harvested if cfg.in_year_range(w.year)]
 
