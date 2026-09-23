@@ -93,21 +93,49 @@ make the kind clear; a guessed role is worse than none.
 Surface every `unsure` to the user rather than deciding yourself. That list is usually
 short and is where the interesting edge cases live.
 
-### Stage 6 - Extract
+### Stage 4b - Overview (abstract level)
 
-This is the expensive stage: every task is an Opus subagent reading one whole paper.
-`run_search.py` writes tasks to `extract/` only when screening is complete, the
-extraction schema is non-empty and the included count is within `max_extraction_tasks`;
-otherwise it prints `[BLOCKED]` with the reason and writes none. **Never work around a
-block** -- do not write task files yourself, do not raise the limit on your own, and do not
-read the papers directly instead. Fix the cause (finish screening, agree the columns with
-the user, tighten the criteria), or put the count to the user and let them raise the limit.
+Once screening is complete, `run_search.py` writes `overview/packet_NN.json`: every
+screened-in, validated work with its full abstract and its cite key. Delegate to the
+**lit-summarizer** subagent, which writes `overview/draft.md`, then re-run. The pipeline
+checks the draft -- every paragraph cited, every quote found in its abstract, every
+number carried by a quote -- and only then publishes `overview.md` between a header and
+footer it writes itself. If it prints `[BLOCKED]`, hand `overview/problems.txt` back to
+the summarizer; never edit the draft past the check yourself.
 
-Before starting, tell the user how many tasks there are and which columns they fill.
+Ask the user for the angle before delegating, if they have one: it goes in
+`summary_focus` ("which materials, and what limits T1"). `summary_group_by` is `role`
+by default; `year` or `theme` on request.
 
-Delegate to the **lit-extractor** subagent, one work at a time, for works that were
-included AND verified. Give it the agreed columns. It reads the open-access PDF where
-`oa_pdf_url` is set and the abstract otherwise, and returns one row per measurement with
+**Show the user `overview.md` before any full-text extraction.** It is cheap, it covers
+every included paper, and it is often the answer they wanted. It is also where they will
+notice that the criteria let in the wrong papers -- which is far cheaper to fix now.
+
+### Stage 6 - Extract, in waves
+
+This is the expensive stage: every task is an Opus subagent reading one whole paper. So it
+runs in waves of `extraction_wave_size` (20) papers, most promising first, and only
+`extraction_waves` waves are issued. `priority.md` ranks every screened-in paper -- role,
+extraction columns named in the abstract, citations per year -- and shows each paper's
+wave and status.
+
+`run_search.py` writes tasks only for issued papers not yet answered, and only when
+screening is complete, the extraction schema is non-empty and the papers issued in total
+stay within `max_extraction_tasks`; otherwise it prints `[BLOCKED]` with the reason and
+writes none. **Never work around a block** -- do not write task files yourself, do not
+raise a limit on your own, and do not read the papers directly instead. Fix the cause
+(finish screening, agree the columns with the user), or put the numbers to the user.
+
+Before each wave, show the user the top of `priority.md` and ask one question: extract
+this wave, adjust the selection, or stop. The user steers with `extract/selection.txt` --
+one cite key per line, `+Key` to read it in the next wave regardless of score, `-Key` to
+never read it. A pin cannot pull in a paper screening did not include.
+
+After a wave, show what came back (`evidence.csv`, `conflicts.md`) and ask whether the
+next wave is worth it. If yes, the user -- not you -- raises `extraction_waves` by one.
+
+Delegate to the **lit-extractor** subagent, one task file at a time, with the agreed
+columns. It reads the open-access PDF where `oa_pdf_url` is set and the abstract otherwise, and returns one row per measurement with
 a mandatory `source_quote`.
 
 Write the rows with `litsearch.export.write_evidence_csv`, which refuses any row whose
@@ -116,7 +144,8 @@ quote is empty. Do not bypass it.
 ### Stage 7 - Report
 
 `run_search.py` already writes `corpus.jsonl`, `refs.bib`, `shortlist.md`,
-`reading_plan.md`, `conflicts.md`, `quarantine.md`, `needs_review.md` and `run.json`, into
+`reading_plan.md`, `overview.md`, `priority.md`, `conflicts.md`, `quarantine.md`,
+`needs_review.md` and `run.json`, into
 `$LITSEARCH_OUT_DIR` (default `~/litsearch-runs/<name>/`) -- **outside the repository**,
 because run outputs are data and must never be committed.
 
@@ -130,7 +159,10 @@ Two of those are worth opening before you write anything:
   writing the "what is contested" section of any synthesis. Each flag is a question: the
   usual answer is different devices or a misread unit, and you have to look to tell.
 
-Add `evidence.csv` from stage 6, then write whichever deliverable was asked for. The rules
+Add `evidence.csv` from stage 6, then write whichever deliverable was asked for. Every
+deliverable states how much was read in full, from the first line of `priority.md`: "numbers
+come from 20 of 47 screened-in papers read in full; the rest appear at abstract level".
+`overview.md` may supply context, never numbers. The rules
 for each are in `docs/OUTPUT_FORMATS.md` and are not negotiable: every claim carries a cite
 key present in `refs.bib`, every number traces to an `evidence.csv` row, nothing that
 failed the gate appears, and every format ends by stating what the search did not cover.
@@ -151,13 +183,12 @@ thin, say so rather than presenting a short list as a complete answer.
 
 ## "Summarise these papers"
 
-This pipeline has no summarise stage, and a request to summarise the whole corpus is the
-single most expensive way to use it: hundreds of full-paper reads that produce nothing
-checkable. Do not do it. Answer with what already exists instead -- `reading_plan.md`
-for "what is in here and where do I start", `shortlist.md` for "what survived", and
-`evidence.csv` plus `conflicts.md` for "what do they report". If the user wants something
-specific from every paper, that is an extraction column: agree it, and extract from the
-screened-in set only.
+The summary is `overview.md` (stage 4b): every screened-in paper, from its abstract, for
+a few hundred tokens a paper. Never answer "summarise these" by reading full papers --
+that is the single most expensive way to use this pipeline, hundreds of full reads that
+produce nothing checkable. For "where do I start", point at `reading_plan.md`; for "what
+are the numbers", at `evidence.csv` and `conflicts.md`, extended wave by wave. If the user
+wants something specific from every paper, that is an extraction column, read in waves.
 
 ## Follow-up questions
 

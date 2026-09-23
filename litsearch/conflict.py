@@ -39,7 +39,7 @@ _NUMBER = re.compile(r"[-+]?\d+(?:[.,]\d+)?(?:\s*[eE][-+]?\d+)?")
 def numeric_value(value) -> float | None:
     """The number a cell states, or None if it does not state one.
 
-    A comma is read as a decimal point, matching ``extract._quote_supports``. That is wrong
+    A comma is read as a decimal point, matching ``extract.quote_supports``. That is wrong
     for a thousands separator, but indexes and papers in this domain write 1,5 far more
     often than 1,500, and the alternative -- guessing per value -- is worse.
     """

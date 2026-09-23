@@ -4,14 +4,14 @@
 
 A worked, completed search is in examples/parametric_gates_bosonic_cavities/.
 
-A full run is three invocations, because the two model-driven stages hand off through
+A full run is several invocations, because the model-driven stages hand off through
 files (nothing here ever calls a model):
 
     python run_search.py     # retrieve, validate, write screening batches
     #   an agent answers <out>/screen/verdicts.jsonl
-    python run_search.py     # apply verdicts, write extraction tasks
-    #   an agent answers <out>/extract/rows.jsonl
-    python run_search.py     # write evidence.csv and the final refs.bib
+    python run_search.py     # apply verdicts; write overview packets and extraction wave 1
+    #   agents write <out>/overview/draft.md and answer <out>/extract/rows.jsonl
+    python run_search.py     # publish overview.md; write evidence.csv and refs.bib
 
 Outputs go to $LITSEARCH_OUT_DIR/<name>/, defaulting to ~/litsearch-runs/<name>/ --
 outside the repository, because search results are data and must never be committed.
@@ -59,9 +59,17 @@ SPEC = SearchSpec(
     # Required: left empty, stage 6 writes no tasks -- extraction fills columns, it does not
     # summarise papers.
     extraction_schema=(),
-    # Stage 6 refuses to write more tasks than this; each task is one full paper read. If it
-    # trips, tighten the inclusion criteria first and raise this only if the count is right.
+    # Stage 6 reads papers in full in waves, most promising first (ranked in priority.md).
+    # After a wave, look at evidence.csv; raise extraction_waves by one to read the next.
+    # Steer the order with <out>/extract/selection.txt: "+Key" to read, "-Key" to skip.
+    extraction_wave_size=20,
+    extraction_waves=1,
+    # Refuses to issue more papers than this across all waves; each is one full paper read.
     max_extraction_tasks=60,
+    # Stage 4b, the abstract-level overview of every screened-in paper. The focus is the
+    # angle it takes; group by "role", "year" or "theme".
+    summary_focus="",
+    summary_group_by="role",
     mailto="",  # your address puts Crossref/OpenAlex requests in the polite pool
 )
 

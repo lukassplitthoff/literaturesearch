@@ -122,9 +122,49 @@ Rules:
 - The threshold is arbitrary and the file says so. A real contradiction narrower than it is
   not flagged.
 
+## `overview.md` -- the abstract-level summary
+
+Produced by `litsearch.overview` from `overview/draft.md`, which the `lit-summarizer` agent
+writes from the full abstracts of every screened-in, validated work. The pipeline writes
+the header and footer; the model writes only the body between them.
+
+Rules, all checked by `overview.check_draft` before anything is published:
+
+- **Every paragraph and bullet cites at least one work**, as `[@Key]`, and every key names
+  a work in the overview set.
+- **A quote attributed to a work occurs verbatim in that work's abstract** (case and
+  whitespace aside).
+- **A number in the prose is carried by such a quote in the same paragraph.** Abstracts do
+  state headline numbers, so numbers are allowed -- with the sentence they came from, the
+  same contract `evidence.csv` has. Counts of papers are written in words.
+- A draft that breaks any rule is not published; the problems go to
+  `overview/problems.txt` and any earlier `overview.md` is removed.
+
+What the header says and the check cannot enforce: an abstract reports a paper's headline
+result, usually its best device under its best conditions, and nothing in the overview
+has been checked against the full text. The footer names the works the text never cites,
+the works with no abstract, the review queue and the quarantine.
+
+## `priority.md` -- the extraction queue
+
+Produced by `litsearch.prioritize`. Deterministic. Ranks every screened-in paper for
+full-text extraction and shows each one's wave and status (`read`, `pending`, `queued`,
+`skipped`). Its first line -- "Read in full: N of M screened-in papers" -- is the coverage
+statement every other deliverable repeats.
+
+- **The score is printed with its parts** -- role points and the extraction-column terms
+  found -- so a placement can be disagreed with. It says which papers are likeliest to
+  state the numbers, not which are best.
+- **`extract/selection.txt` overrides it**: `+Key` reads a paper in the next wave, `-Key`
+  never. A pin cannot pull in a paper screening did not include.
+- **A wave, once issued, does not move** (`extract/waves.json`), so a user who approved
+  twenty papers gets those twenty even if the score shifts.
+
 ## `review.md` -- the synthesis
 
-Prose, written last, for a reader who wants the answer rather than the corpus.
+Prose, written last, for a reader who wants the answer rather than the corpus. Built from
+`evidence.csv` for every number and from `overview.md` for context, and it says which is
+which: the coverage line from `priority.md` goes in the opening paragraph.
 
 Structure:
 
@@ -140,7 +180,8 @@ Structure:
    can point at -- a resolved conflict, or one the conditions explain -- not an impression.
 5. **Limits of this search** (rule 5 above).
 
-Prohibited: a "conclusion" paragraph that generalises beyond the rows; comparative claims
+Prohibited: a number taken from `overview.md` rather than `evidence.csv` -- the overview
+is abstract-level and unverified; a "conclusion" paragraph that generalises beyond the rows; comparative claims
 ("the best", "the first") unless a cited paper makes that claim itself; any sentence
 whose cite key you cannot point to in `refs.bib`.
 

@@ -39,23 +39,29 @@ search with its numbers, and it is shorter than this README:
 
 - [examples/parametric_gates_bosonic_cavities/](examples/parametric_gates_bosonic_cavities/README.md)
 
-Then copy `run_search.py`, edit the `SearchSpec`, and run it. A full search is three
-invocations, because the two model-driven stages hand off through files:
+Then copy `run_search.py`, edit the `SearchSpec`, and run it. A full search is several
+invocations, because the model-driven stages hand off through files:
 
 ```bash
 python run_search.py     # retrieve, validate, write screening batches
 #   an agent answers <out>/screen/verdicts.jsonl
-python run_search.py     # apply verdicts, write extraction tasks
-#   an agent answers <out>/extract/rows.jsonl
-python run_search.py     # write evidence.csv and the final refs.bib
+python run_search.py     # apply verdicts; write overview packets and extraction wave 1
+#   an agent writes <out>/overview/draft.md, another answers <out>/extract/rows.jsonl
+python run_search.py     # publish overview.md; write evidence.csv and the final refs.bib
 ```
 
-Extraction is the expensive stage -- every task is a full paper read -- so the second
-invocation writes **no** extraction tasks unless all three hold: every work that needed a
-screening verdict has one, `extraction_schema` names at least one column, and no more than
-`max_extraction_tasks` (default 60) works are screened in. It prints which one failed.
+After screening you get two summaries at two costs. **`overview.md`** covers every
+screened-in paper from its abstract -- cheap, and often the answer. **`evidence.csv`**
+holds numbers read from the full text, in waves of 20 papers ranked in `priority.md`;
+raise `extraction_waves` by one to read the next wave, and steer the order with
+`extract/selection.txt` (`+Key` read, `-Key` skip).
 
-Inside Claude Code, `/litsearch "<your question>"` drives all three and fills in the
+Full-text extraction is the expensive stage, so the run writes **no** extraction tasks
+unless screening is complete, `extraction_schema` names at least one column, and the papers
+issued across all waves stay within `max_extraction_tasks` (default 60). It prints which
+one failed.
+
+Inside Claude Code, `/litsearch "<your question>"` drives them all and fills in the
 agent steps for you. Outputs go to `$LITSEARCH_OUT_DIR/<name>/`, default
 `~/litsearch-runs/<name>/` -- outside the repository, because run results are data.
 
@@ -94,8 +100,9 @@ domain expert before any run, which does not exist yet.
 
 A question, hypothesis or topic goes in; a validated corpus, a screened evidence set and a
 structured evidence table come out. Any written synthesis is built from those files
-afterwards -- never by re-reading or summarising the papers. Eight stages, with deterministic Python and the language model kept
-strictly apart -- Python does HTTP, dedup, caching and validation and contains no model call;
+afterwards -- never by re-reading or summarising the papers. Eight stages, with
+deterministic Python and the language model kept strictly apart -- Python does HTTP,
+dedup, caching and validation and contains no model call;
 Claude does language work and never touches HTTP. Every stage boundary is a file on disk, so
 any stage can be re-run or inspected alone.
 
@@ -106,8 +113,9 @@ any stage can be re-run or inspected alone.
 | 2 | Merge | Python | Dedup DOI -> arXiv id -> fuzzy title. One record per paper |
 | 3 | Snowball | Python | Backward references + forward citations, until saturation |
 | 4 | Screen | Claude (cheap) | Title+abstract vs criteria -> include / exclude / unsure, plus what kind of paper it is |
+| 4b | Overview | Claude (cheap) | Full abstracts of every included paper -> `overview.md`, every sentence cited, every number quoted |
 | 5 | **Validate** | bibcheck | **The hard gate.** Only `verified` works proceed |
-| 6 | Extract | Claude (strong) | Structured fields, each with a mandatory `source_quote` |
+| 6 | Extract | Claude (strong) | Full text, in ranked waves of 20. Structured fields, each with a mandatory `source_quote` |
 | 7 | Render | Python | bibtex, evidence table, reading plan, conflict candidates, quarantine, run log |
 
 ### Sources
@@ -156,7 +164,13 @@ current state of the art -- usually the reason for the search -- off the end of 
 
 ### What a finished run leaves you
 
-Beyond `refs.bib` and `evidence.csv`, two files exist to be read rather than cited:
+Beyond `refs.bib` and `evidence.csv`, four files exist to be read rather than cited:
+
+- **`overview.md`** -- what every screened-in paper reports, from its abstract. Every
+  paragraph cited, every number quoted from an abstract and checked against it. Abstract
+  level only, and it says so.
+- **`priority.md`** -- the full-text extraction queue: every screened-in paper ranked, with
+  its wave and status, headed by how many have been read in full.
 
 - **`reading_plan.md`** -- the validated works sorted into foundation, core evidence and
   frontier, each phase carrying the rule that filled it. Metadata only; it makes no claim

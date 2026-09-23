@@ -80,6 +80,11 @@ One JSON object per measurement:
 - Units: convert into the schema's unit and say so in `note` if the paper used another.
   If a conversion is ambiguous, leave `null` rather than guessing.
 
+**Always write at least one row.** A paper with nothing to report -- no value you can
+quote for any column -- still gets one row: its `cite_key`, every field `null`, an empty
+`source_quote`, and the reason in `note`. That row is how the run knows the paper was
+read; without it the paper is issued again in the next wave.
+
 ## Boundaries
 
 The **only** file you write is the run's `extract/rows.jsonl`, one JSON object per line,

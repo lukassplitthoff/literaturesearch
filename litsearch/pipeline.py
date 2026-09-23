@@ -1,18 +1,20 @@
-"""The seven-stage run, so a search is a configuration rather than a copied script.
+"""The eight-stage run, so a search is a configuration rather than a copied script.
 
 Every search differs only in its question, its queries and its criteria. Keeping the stage
 sequence here means a fix reaches every search at once, and an example is short enough to
 read in one screen.
 
-Stages 4 and 6 need a language model, and nothing in this module calls one. They hand off
-through files: the run writes tasks, an agent answers them, and the next run reads the
-answers. So a full search is three invocations:
+Screening, the overview and extraction need a language model, and nothing in this module
+calls one. They hand off through files: the run writes tasks, an agent answers them, and
+the next run reads the answers. So a full search is a sequence of invocations:
 
     python <search>.py     # retrieve, validate, write screening batches
     #   lit-screener answers screen/verdicts.jsonl
-    python <search>.py     # apply verdicts, write extraction tasks
-    #   lit-extractor answers extract/rows.jsonl
-    python <search>.py     # write evidence.csv and the final refs.bib
+    python <search>.py     # apply verdicts; write overview packets and extraction wave 1
+    #   lit-summarizer writes overview/draft.md
+    #   lit-extractor answers extract/rows.jsonl for the wave's papers
+    python <search>.py     # publish overview.md; write evidence.csv and refs.bib
+    #   to read further: raise extraction_waves by one and repeat the last two steps
 
 Re-running is cheap: every index response is cached on disk.
 """
@@ -20,9 +22,22 @@ Re-running is cheap: every index response is cached on disk.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from bibcheck.verify import IndexClient
-from litsearch import conflict, export, extract, plan, relevance, report, retrieve, screen, snowball
+from litsearch import (
+    conflict,
+    export,
+    extract,
+    overview,
+    plan,
+    prioritize,
+    relevance,
+    report,
+    retrieve,
+    screen,
+    snowball,
+)
 from litsearch.config import OUT_DIR_ENV, SearchConfig, run_dir, warn_if_inside_repo
 from litsearch.gate import validate_all
 from litsearch.sources.base import Fetcher
@@ -81,8 +96,18 @@ class SearchSpec:
     # Stage 6 columns. Each must be quotable from the paper or it is recorded null. Required:
     # with none, stage 6 writes no tasks.
     extraction_schema: tuple[str, ...] = ()
-    # Stage 6 refuses to write more tasks than this. Each task is a full paper read.
+    # Stage 6 reads papers in full in waves, most promising first (see priority.md). Only
+    # `extraction_waves` waves are issued; raise it by one to read the next wave.
+    extraction_wave_size: int = prioritize.DEFAULT_WAVE_SIZE
+    extraction_waves: int = 1
+    # Stage 6 refuses to issue more papers than this in total. Each is a full paper read.
     max_extraction_tasks: int = extract.DEFAULT_MAX_TASKS
+
+    # Stage 4b, the abstract-level overview of every screened-in paper. `summary_focus` is
+    # the angle it takes ("which materials, and what limits T1"); empty describes the set.
+    # `summary_group_by` is "role", "year" or "theme" (the summarizer proposes the themes).
+    summary_focus: str = ""
+    summary_group_by: str = "role"
 
     mailto: str = ""
     offline: bool = False
@@ -106,26 +131,140 @@ class SearchSpec:
         )
 
 
-def select_for_extraction(corpus, counts: dict[str, int], spec: SearchSpec) -> tuple[list, list[str]]:
-    """The works stage 6 may read, and the reasons it may not run at all.
+def select_for_extraction(corpus) -> list:
+    """The works later stages may read: screened in AND verified.
 
-    Only works that both passed the gate and were screened in are candidates. There is
-    deliberately no fallback to "every validated work" when screening has not happened:
-    that fallback once turned a run with no verdicts into hundreds of full-paper reads.
-
-    Args:
-        corpus: the screened corpus.
-        counts: the verdict counts returned by ``screen.apply_verdicts``.
-        spec: the search, for its extraction schema and task limit.
-
-    Returns:
-        (candidates, blockers). Tasks are written only when ``blockers`` is empty.
+    There is deliberately no fallback to "every validated work" when screening has not
+    happened: that fallback once turned a run with no verdicts into hundreds of full-paper
+    reads. With no verdicts, this is empty.
     """
-    candidates = [work for work in screen.included(corpus) if work.validation == "verified"]
-    blockers = extract.extraction_blockers(
-        len(candidates), counts["unscreened"], spec.extraction_schema, spec.max_extraction_tasks
+    return [work for work in screen.included(corpus) if work.validation == "verified"]
+
+
+def run_overview(
+    out_dir: Path,
+    spec: SearchSpec,
+    included: list,
+    cite_keys: dict[int, str],
+    unscreened: int,
+    review_queue: int,
+    quarantined: int,
+) -> str:
+    """Stage 4b: write overview packets, and publish overview.md once a clean draft exists.
+
+    Returns the stage's state: blocked, empty, waiting, problems or published.
+    """
+    overview_dir = out_dir / "overview"
+    published = out_dir / "overview.md"
+    problems_path = overview_dir / "problems.txt"
+    if unscreened or not included:
+        # An overview.md from an earlier, finished screen no longer describes this one.
+        published.unlink(missing_ok=True)
+    if unscreened:
+        print(f"  [BLOCKED] {unscreened} work(s) have no screening verdict; the overview needs a finished screen")
+        return "blocked"
+    if not included:
+        print("  nothing screened in -- no overview")
+        return "empty"
+    packets, no_abstract = overview.prepare_packets(
+        included,
+        cite_keys,
+        spec.question,
+        overview_dir,
+        focus=spec.summary_focus,
+        group_by=spec.summary_group_by,
     )
-    return candidates, blockers
+    size = sum(path.stat().st_size for path in packets)
+    print(
+        f"  {len(included)} work(s) in {len(packets)} packet(s), {size / 1024:.0f} KB "
+        f"(~{size // 4000} k tokens); {len(no_abstract)} without an abstract"
+    )
+    draft_path = overview_dir / "draft.md"
+    if not draft_path.exists():
+        print(f"  no draft yet -- lit-summarizer writes {draft_path}, then re-run")
+        return "waiting"
+
+    draft = draft_path.read_text(encoding="utf-8")
+    keyed = [(cite_keys[position], work) for position, work in enumerate(included) if position in cite_keys]
+    abstracts = {key: work.abstract for key, work in keyed if (work.abstract or "").strip()}
+    problems = overview.check_draft(draft, abstracts)
+    if problems:
+        # Fail closed: a stale overview.md from an earlier draft must not outlive a bad one.
+        published.unlink(missing_ok=True)
+        problems_path.write_text("\n".join(problems) + "\n", encoding="utf-8")
+        print(f"  [BLOCKED] the draft breaks {len(problems)} rule(s); overview.md not written. All in {problems_path}")
+        for problem in problems[:5]:
+            print(f"    - {problem}")
+        return "problems"
+    problems_path.unlink(missing_ok=True)
+    not_discussed = overview.write_overview(
+        published,
+        draft,
+        spec.question,
+        spec.summary_focus,
+        [key for key, _ in keyed],
+        no_abstract,
+        review_queue=review_queue,
+        quarantined=quarantined,
+    )
+    print(f"  overview.md written; {len(not_discussed)} included work(s) not discussed, listed in its footer")
+    return "published"
+
+
+@dataclass
+class ExtractionPlan:
+    """What stage 6 will do: the ranked queue, the waves, and what blocks it."""
+
+    ranked: list[dict]
+    waves: list[list[str]]
+    answered: set[str]
+    pending: list[str]
+    queued: list[str]
+    skipped: set[str]
+    ignored: list[str]
+    blockers: list[str]
+
+
+def plan_extraction(
+    included: list,
+    cite_keys: dict[int, str],
+    unscreened: int,
+    spec: SearchSpec,
+    extract_dir: Path,
+    rows: list[dict],
+) -> ExtractionPlan:
+    """Rank the screened-in papers, cut the authorised waves, and check the preconditions.
+
+    Reads extract/selection.txt and extract/waves.json but writes nothing, so the plan can
+    be inspected -- and tested -- before any task file exists.
+    """
+    pinned, skipped = prioritize.load_selection(extract_dir / "selection.txt")
+    candidates = {cite_keys[position] for position in range(len(included)) if position in cite_keys}
+    # A selection can only reorder or drop screened-in papers; it cannot pull one in.
+    ignored = [key for key in list(pinned) + sorted(skipped) if key not in candidates]
+    pinned = [key for key in pinned if key in candidates]
+    ranked = prioritize.score_works(included, cite_keys, spec.extraction_schema, pinned)
+    waves = prioritize.plan_waves(
+        [row["key"] for row in ranked],
+        prioritize.load_waves(extract_dir / "waves.json"),
+        spec.extraction_wave_size,
+        spec.extraction_waves,
+        skipped,
+    )
+    issued = {key for wave in waves for key in wave}
+    answered = prioritize.answered_keys(rows)
+    return ExtractionPlan(
+        ranked=ranked,
+        waves=waves,
+        answered=answered,
+        pending=[key for wave in waves for key in wave if key not in answered],
+        queued=[row["key"] for row in ranked if row["key"] not in issued and row["key"] not in skipped],
+        skipped=skipped,
+        ignored=ignored,
+        blockers=extract.extraction_blockers(
+            len(issued), unscreened, spec.extraction_schema, spec.max_extraction_tasks
+        ),
+    )
 
 
 def run(spec: SearchSpec) -> int:
@@ -140,21 +279,21 @@ def run(spec: SearchSpec) -> int:
     print(f"question: {cfg.question}")
     print(f"output  : {cfg.out_dir}  (override with ${OUT_DIR_ENV})\n")
 
-    print("[1/7] retrieve")
+    print("[1/8] retrieve")
     corpus = retrieve.run(fetcher, cfg)
     fetcher.save_cache()  # flush before each long stage, so an interrupt costs nothing
 
-    print("\n[2/7] snowball")
+    print("\n[2/8] snowball")
     rounds = snowball.expand(fetcher, corpus, cfg)
     fetcher.save_cache()
 
-    print("\n[3/7] validate (the gate)")
+    print("\n[3/8] validate (the gate)")
     client = IndexClient(cache_path=cfg.cache_path, mailto=cfg.mailto, offline=cfg.offline)
     passed, verdicts = validate_all(corpus.works, client)
     fetcher.save_cache()
     print(f"  {len(passed)} verified, {len(verdicts) - len(passed)} quarantined")
 
-    print("\n[4/7] known-item check")
+    print("\n[4/8] known-item check")
     known = report.known_item_results(corpus, cfg.known_items)
     for row in known:
         mark = "OK  " if row["found"] else "MISS"
@@ -173,7 +312,7 @@ def run(spec: SearchSpec) -> int:
             mark = "OK  " if row["found"] else "MISS"
             print(f"    [{mark}] {row['key']:30s} {row['screen']}")
 
-    print("\n[5/7] screen")
+    print("\n[5/8] screen")
     screen_dir = cfg.out_dir / "screen"
     to_model, rule_excluded = relevance.triage_all(corpus.works, spec.screen_required, spec.screen_forbidden)
     print(f"  triage: {len(rule_excluded)} excluded by rule, {len(to_model)} need the model")
@@ -211,29 +350,73 @@ def run(spec: SearchSpec) -> int:
             print(f"  roles on {counts['roled']}/{screened} screened work(s)")
     review_queue = screen.write_review_queue(cfg.out_dir / "needs_review.md", screen.needs_review(corpus))
 
-    print("\n[6/7] extract")
-    included, blockers = select_for_extraction(corpus, counts, spec)
-    extract_dir = cfg.out_dir / "extract"
     # The works that will be rendered into refs.bib, and the keys they will carry there.
-    # Extraction is given those keys so that evidence.csv can be joined to the bibliography
-    # -- the output contract requires every cite_key to name a real entry, and tasks used to
-    # be handed placeholders like work007 instead.
+    # The overview and extraction are given those keys so that both can be joined to the
+    # bibliography -- the output contract requires every cite_key to name a real entry, and
+    # tasks used to be handed placeholders like work007 instead.
+    included = select_for_extraction(corpus)
     bib_works = included or passed
     cite_keys = export.cite_keys_for(bib_works)
-    print(f"  {len(included)} work(s) screened in and verified (limit {spec.max_extraction_tasks})")
-    if blockers:
+    included_keys = cite_keys if included else {}
+
+    print("\n[6/8] overview (abstract level)")
+    run_overview(
+        cfg.out_dir,
+        spec,
+        included,
+        included_keys,
+        counts["unscreened"],
+        review_queue,
+        len(verdicts) - len(passed),
+    )
+
+    print("\n[7/8] extract (full text, in waves)")
+    extract_dir = cfg.out_dir / "extract"
+    rows = extract.load_rows(extract_dir / "rows.jsonl")
+    extraction = plan_extraction(included, included_keys, counts["unscreened"], spec, extract_dir, rows)
+    coverage = prioritize.write_priority(
+        cfg.out_dir / "priority.md",
+        extraction.ranked,
+        extraction.waves,
+        extraction.answered,
+        extraction.skipped,
+        spec.extraction_schema,
+        extraction.blockers,
+    )
+    print(
+        f"  {len(included)} work(s) screened in and verified; waves of {spec.extraction_wave_size}, "
+        f"{spec.extraction_waves} authorised, at most {spec.max_extraction_tasks} papers in total"
+    )
+    for key in extraction.ignored:
+        print(f"  [WARN] selection.txt names {key}, which is not a screened-in, citable work -- ignored")
+    if extraction.blockers:
         extract.clear_tasks(extract_dir)
         tasks = []
         print("  [BLOCKED] no extraction tasks written:")
-        for reason in blockers:
+        for reason in extraction.blockers:
             print(f"    - {reason}")
     else:
-        tasks = extract.prepare_tasks(included, extract_dir, schema=spec.extraction_schema, cite_keys=cite_keys)
-        print(
-            f"  {len(tasks)} extraction task(s) x {len(spec.extraction_schema)} field(s); "
-            f"each task is one extractor reading one full paper"
+        prioritize.save_waves(extract_dir / "waves.json", extraction.waves)
+        position_of = {key: position for position, key in included_keys.items()}
+        tasks = extract.prepare_tasks(
+            [included[position_of[key]] for key in extraction.pending],
+            extract_dir,
+            schema=spec.extraction_schema,
+            cite_keys=dict(enumerate(extraction.pending)),
         )
-    rows = extract.load_rows(extract_dir / "rows.jsonl")
+        for number, wave in enumerate(extraction.waves, start=1):
+            read = sum(key in extraction.answered for key in wave)
+            print(f"  wave {number}: {len(wave)} paper(s), {read} read, {len(wave) - read} pending")
+        print(
+            f"  {len(tasks)} task(s) x {len(spec.extraction_schema)} field(s) written; "
+            f"each is one extractor reading one full paper"
+        )
+        if not tasks and extraction.queued:
+            print(
+                f"  every issued wave is read; {len(extraction.queued)} paper(s) still queued -- set "
+                f"extraction_waves={len(extraction.waves) + 1} to issue the next wave"
+            )
+    print(f"  read in full: {coverage['answered']} of {coverage['included']} screened-in paper(s), see priority.md")
     accepted, complaints = extract.validate_rows(rows, schema=spec.extraction_schema)
     print(f"  {len(accepted)}/{len(rows)} rows accepted")
     if complaints:
@@ -243,7 +426,7 @@ def run(spec: SearchSpec) -> int:
     if tasks and not rows:
         print(f"  no rows yet -- answer the tasks into {extract_dir / 'rows.jsonl'}, then re-run")
 
-    print("\n[7/7] write outputs")
+    print("\n[8/8] write outputs")
     corpus.write_jsonl(cfg.out_dir / "corpus.jsonl")
     report.write_shortlist(cfg.out_dir / "shortlist.md", passed)
     held = report.write_quarantine(cfg.out_dir / "quarantine.md", verdicts)

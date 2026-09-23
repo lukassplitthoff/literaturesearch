@@ -28,7 +28,9 @@ INSTRUCTIONS = (
     "rows. Every value MUST be accompanied by 'source_quote', the sentence from the paper "
     "containing it, quoted verbatim. If you cannot quote it, set the field to null and say "
     "why in 'note'. Never supply a number from memory. Set 'confidence' to 'full_text' only "
-    "if you actually read the PDF, otherwise 'abstract_only'."
+    "if you actually read the PDF, otherwise 'abstract_only'. Always write at least one row: "
+    "a paper with nothing to report gets one row with every field null, an empty "
+    "'source_quote', and the reason in 'note' -- that row is how the run knows it was read."
 )
 
 DEFAULT_SCHEMA = (
@@ -50,7 +52,7 @@ DEFAULT_MAX_TASKS = 60
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
-def extraction_blockers(candidates: int, unscreened: int, schema: tuple[str, ...], max_tasks: int) -> list[str]:
+def extraction_blockers(planned: int, unscreened: int, schema: tuple[str, ...], max_tasks: int) -> list[str]:
     """Why stage 6 must not write tasks yet. An empty list means it may.
 
     Extraction reads the papers screening has already chosen; it is never the step that
@@ -59,7 +61,7 @@ def extraction_blockers(candidates: int, unscreened: int, schema: tuple[str, ...
     expensive stage run on whatever happens to be lying around.
 
     Args:
-        candidates: works that were screened in and passed the gate.
+        planned: papers issued for extraction across every wave, including a new one.
         unscreened: works that needed a model verdict and have none.
         schema: the columns to extract.
         max_tasks: the largest number of tasks allowed without raising the limit.
@@ -75,10 +77,10 @@ def extraction_blockers(candidates: int, unscreened: int, schema: tuple[str, ...
             "extraction_schema is empty. Extraction fills declared columns; it does not read or "
             "summarise papers without them"
         )
-    if candidates > max_tasks:
+    if planned > max_tasks:
         blockers.append(
-            f"{candidates} works are screened in, above max_extraction_tasks={max_tasks}. Tighten the "
-            f"inclusion criteria, or raise the limit on the SearchSpec if this many is intended"
+            f"{planned} papers would be issued for extraction, above max_extraction_tasks={max_tasks}. "
+            f"Lower extraction_waves, or raise the limit on the SearchSpec if this many is intended"
         )
     return blockers
 
@@ -163,7 +165,7 @@ def is_numeric(value) -> bool:
     return bool(_NUMERIC_VALUE.match(str(value))) if value not in (None, "", []) else False
 
 
-def _quote_supports(value, quote: str) -> bool:
+def quote_supports(value, quote: str) -> bool:
     """Does the quote plausibly contain the claimed number?
 
     Deliberately forgiving about formatting -- a paper may write 0.36 ms where the schema
@@ -196,19 +198,24 @@ def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) ->
     number it claims is *flagged and kept* -- the check is a heuristic over units and
     formatting, and silently discarding real measurements over it would be worse than
     surfacing them for a human to glance at.
+
+    A row with no quote AND no value is neither: it is the extractor saying it read the
+    paper and found nothing to report. It is not evidence and not a complaint.
     """
     accepted = []
     complaints = []
     for position, row in enumerate(rows):
         quote = str(row.get("source_quote", "")).strip()
         key = row.get("cite_key", f"row{position}")
+        if not quote and not any(row.get(field) not in (None, "", []) for field in schema):
+            continue
         if not quote:
             complaints.append(f"{key}: dropped, no source_quote")
             continue
         unsupported = [
             field
             for field in schema
-            if row.get(field) not in (None, "", []) and not _quote_supports(row.get(field), quote)
+            if row.get(field) not in (None, "", []) and not quote_supports(row.get(field), quote)
         ]
         if unsupported:
             complaints.append(f"{key}: quote does not contain {', '.join(unsupported)}")
