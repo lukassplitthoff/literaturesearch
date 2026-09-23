@@ -5,7 +5,7 @@ strong-drive limits in Josephson circuits, frequency collisions under parametric
 modulation, and a linear coupler designed against drive-induced spurious processes -- but
 all three are arXiv records that OpenAlex holds no citation graph for, so seeding from
 them would expand nothing. They are the gold set instead: recall against them measures
-whether the queries alone find this literature. See README.md in this directory.
+whether the queries alone find this literature.
 
 Run from the repository root:
 

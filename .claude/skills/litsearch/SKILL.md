@@ -63,6 +63,24 @@ papers. Write them into `QUERIES` in `run_search.py`, along with `KNOWN_ITEMS`,
 Also write down the inclusion and exclusion criteria explicitly, in one or two sentences
 each. The screener needs them and cannot invent them.
 
+**Every criterion must be decidable from a title and abstract.** Screen on the subject --
+the device, the physics, the quantity. A question about *how* papers did something (which
+simulation method, which fabrication step) is usually answered in the body, not the
+abstract: put it in an extraction column instead. A criterion like "uses a Floquet-Markov
+analysis" once excluded one of the user's own reference papers and left 43 papers unsure,
+all for the same reason: the abstract never named the method.
+
+**Reference papers the user names are a gold set first, seeds second.** Put them in a
+gold-set file (DOI plus `arxiv` id) so recall against them is measured. Seed only a paper
+the queries cannot find -- typically one too recent to rank -- and say so in a comment.
+Seeding an arXiv-only record expands nothing: OpenAlex usually holds no references or
+citers for it.
+
+**A question about methods or theory needs its own wave ranking.** The default ranks
+experimental (`primary`) papers first, with terms from the extraction column names. For
+"how is X simulated / modelled", set `priority_role_points` to put `theory` and `method`
+first and `priority_terms` to the words that mark the papers worth reading in full.
+
 ### Stages 1, 2, 3, 5 - Run the deterministic pipeline
 
 ```bash
@@ -91,7 +109,11 @@ nothing here because the abstract is already being read. Omitted when the abstra
 make the kind clear; a guessed role is worse than none.
 
 Surface every `unsure` to the user rather than deciding yourself. That list is usually
-short and is where the interesting edge cases live.
+short and is where the interesting edge cases live. If it is long and the reasons repeat
+("method not stated", "value not in abstract"), the criteria are asking something an
+abstract cannot answer -- revise them with the user and re-screen, rather than deciding
+the pile yourself. Check the gold-set line after screening too: a gold paper that is
+found but screened out is the same symptom.
 
 ### Stage 4b - Overview (abstract level)
 
