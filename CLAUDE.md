@@ -2,7 +2,10 @@
 
 ## Environment
 
-Python `>=3.10`. Runtime dependency: `requests`. Dev: `pytest`, `pre-commit`.
+Python `>=3.10`. Runtime dependencies: `requests`, `pypdf`. Dev: `pytest`, `pre-commit`.
+Optional system tool: `pdftotext` (Poppler/Xpdf), used for PDF text when on PATH -- it
+keeps more quotes intact than pypdf. Do not add PyMuPDF: it is AGPL, and this repo is
+Apache-2.0.
 
 ```bash
 pip install -e ".[dev]"

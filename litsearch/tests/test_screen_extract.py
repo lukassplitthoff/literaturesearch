@@ -112,20 +112,21 @@ def test_review_queue_is_written(tmp_path):
 # -------------------------------------------------------------------------- extraction
 
 
-def test_tasks_carry_the_pdf_url_and_schema(tmp_path):
-    work = Work(title="A paper", doi="10.1/a", oa_pdf_url="https://example.org/a.pdf", abstract="text")
+def test_tasks_carry_the_key_and_the_schema(tmp_path):
+    work = Work(title="A paper", doi="10.1/a", abstract="text")
     paths = extract.prepare_tasks([work], tmp_path, schema=("T1_us",), cite_keys={0: "Ann2020"})
     payload = json.loads(paths[0].read_text(encoding="utf-8"))
     assert payload["cite_key"] == "Ann2020"
-    assert payload["has_open_access_pdf"] is True
     assert payload["schema"] == ["T1_us"]
+    assert payload["columns"] == [{"name": "T1_us", "type": "text", "definition": ""}]
 
 
-def test_task_marks_papers_without_an_open_access_pdf(tmp_path):
-    paths = extract.prepare_tasks([Work(title="Paywalled", doi="10.1/b")], tmp_path)
-    payload = json.loads(paths[0].read_text(encoding="utf-8"))
-    assert payload["has_open_access_pdf"] is False
-    assert payload["pdf_url"] == ""
+def test_a_task_with_no_fetch_at_all_is_abstract_only(tmp_path):
+    payload = json.loads(
+        extract.prepare_tasks([Work(title="Paywalled", doi="10.1/b")], tmp_path)[0].read_text(encoding="utf-8")
+    )
+    assert payload["text_path"] == ""
+    assert payload["text_note"]
 
 
 def test_row_without_a_quote_is_dropped():
@@ -323,30 +324,28 @@ def test_the_checksum_is_precomputed_in_the_batch(tmp_path):
     assert counts["misaligned"] == 0 and len(screen.included(corpus)) == 1
 
 
-def test_task_offers_the_arxiv_pdf_as_well(tmp_path):
-    """Every publisher PDF url failed on the first real extraction run: APS 403, Nature
-    redirected into auth. The arXiv preprint of the same paper was open."""
-    work = Work(
-        title="A paper", doi="10.1103/x", arxiv_id="2303.00959", oa_pdf_url="http://link.aps.org/pdf/10.1103/x"
-    )
-    payload = json.loads(extract.prepare_tasks([work], tmp_path)[0].read_text(encoding="utf-8"))
-    assert payload["arxiv_pdf_url"] == "https://arxiv.org/pdf/2303.00959"
-    assert payload["pdf_url"].startswith("http://link.aps.org")
+def test_a_task_points_at_text_not_at_urls(tmp_path):
+    """Extractors used to be handed PDF urls and fetch them; every quality problem of the
+    first full-text run came from that. They now get text the pipeline already fetched."""
+    from litsearch.fulltext import FullText
+
+    work = Work(title="A paper", doi="10.1103/x", arxiv_id="2303.00959", oa_pdf_url="http://link.aps.org/pdf/x")
+    texts = {"work000": FullText("work000", "text/work000.txt", "arxiv")}
+    payload = json.loads(extract.prepare_tasks([work], tmp_path, texts=texts)[0].read_text(encoding="utf-8"))
+    assert payload["text_path"] == "text/work000.txt" and payload["text_source"] == "arxiv"
+    assert not any("url" in field for field in payload), "no url for the extractor to fetch"
 
 
-def test_a_work_with_only_an_arxiv_id_counts_as_reachable(tmp_path):
-    work = Work(title="A preprint", arxiv_id="2101.00001")
-    payload = json.loads(extract.prepare_tasks([work], tmp_path)[0].read_text(encoding="utf-8"))
-    assert payload["has_open_access_pdf"] is True
-    assert payload["arxiv_pdf_url"].endswith("2101.00001")
+def test_a_task_without_text_says_why(tmp_path):
+    from litsearch.fulltext import FullText
 
-
-def test_a_work_with_neither_is_marked_unreachable(tmp_path):
+    texts = {"work000": FullText("work000", note="arxiv: not a PDF (text/html)")}
     payload = json.loads(
-        extract.prepare_tasks([Work(title="Paywalled", doi="10.1/b")], tmp_path)[0].read_text(encoding="utf-8")
+        extract.prepare_tasks([Work(title="Paywalled", doi="10.1/b")], tmp_path, texts=texts)[0].read_text(
+            encoding="utf-8"
+        )
     )
-    assert payload["has_open_access_pdf"] is False
-    assert payload["arxiv_pdf_url"] == ""
+    assert payload["text_path"] == "" and "not a PDF" in payload["text_note"]
 
 
 def test_descriptive_fields_are_not_digit_checked():

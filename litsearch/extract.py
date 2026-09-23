@@ -15,23 +15,61 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
+from litsearch.fulltext import FullText, quote_found
 from litsearch.sources.base import Work
 
 INSTRUCTIONS = (
-    "Read the paper, preferring 'arxiv_pdf_url' if present -- publisher PDF links are "
-    "usually paywalled or blocked, while the arXiv preprint of the same work is open. "
-    "Reading the preprint counts as full_text; say which version you read in 'note'. "
-    "Extract the requested fields from this paper. Emit one JSON object per distinct "
-    "measurement -- a paper reporting several devices or several qubits yields several "
-    "rows. Every value MUST be accompanied by 'source_quote', the sentence from the paper "
-    "containing it, quoted verbatim. If you cannot quote it, set the field to null and say "
-    "why in 'note'. Never supply a number from memory. Set 'confidence' to 'full_text' only "
-    "if you actually read the PDF, otherwise 'abstract_only'. Always write at least one row: "
-    "a paper with nothing to report gets one row with every field null, an empty "
-    "'source_quote', and the reason in 'note' -- that row is how the run knows it was read."
+    "Read the paper's text at 'text_path' (relative to the extract directory) -- the pipeline "
+    "has already fetched and converted it; do not fetch anything. If 'text_path' is empty, no "
+    "full text could be obtained ('text_note' says why): extract from 'abstract' and set "
+    "'confidence' to 'abstract_only'; otherwise 'full_text'. Fill the 'columns' as each "
+    "definition says; a 'choice' column takes exactly one of its listed values, a 'number' "
+    "column a bare number. Emit one JSON object per distinct result -- several devices or "
+    "regimes yield several rows. Every value MUST be accompanied by 'source_quote', a sentence "
+    "copied from the text exactly as it appears there; the pipeline checks it against the same "
+    "text and refuses a row whose quote is not found. Copy line breaks as spaces and leave "
+    "hyphenation and symbols as they are -- the check ignores whitespace and hyphens, not "
+    "edits. If you cannot quote it, set the field to null and say why in 'note'. Never supply "
+    "a value from memory. Always write at least one row: a paper with nothing to report gets "
+    "one row with every field null, an empty 'source_quote', and the reason in 'note'. Write "
+    "all rows once, to 'rows_file'."
 )
+
+
+@dataclass(frozen=True)
+class Column:
+    """One extraction column: its name, what kind of value it holds, and what it means.
+
+    A bare name is still accepted in a schema and becomes a free-text column. Types and
+    definitions exist because the first real extraction showed what happens without them:
+    a yes/no column came back as "True", "yes -- predicted..." and "partly: ...", and one
+    "critical photon number" column held three different quantities from three papers.
+    """
+
+    name: str
+    kind: str = "text"  # "text", "number" or "choice"
+    definition: str = ""
+    choices: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict:
+        spec = {"name": self.name, "type": self.kind, "definition": self.definition}
+        if self.choices:
+            spec["choices"] = list(self.choices)
+        return spec
+
+
+def as_columns(schema) -> tuple[Column, ...]:
+    """A schema of names and/or Columns, as Columns."""
+    return tuple(item if isinstance(item, Column) else Column(str(item)) for item in schema)
+
+
+def column_names(schema) -> tuple[str, ...]:
+    """Just the names, for the code that only needs those."""
+    return tuple(column.name for column in as_columns(schema))
+
 
 DEFAULT_SCHEMA = (
     "qubit_type",
@@ -102,31 +140,28 @@ def rows_file(cite_key: str) -> str:
     return f"{ROWS_DIR}/{cite_key}.jsonl"
 
 
-def arxiv_pdf_url(arxiv_id: str | None) -> str:
-    """The arXiv PDF for an id, or '' when there is none."""
-    return f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else ""
+def task_for(work: Work, cite_key: str, schema, fulltext: FullText | None = None) -> dict:
+    """One extraction task: the paper, the text to read, and the columns to fill.
 
-
-def task_for(work: Work, cite_key: str, schema: tuple[str, ...]) -> dict:
-    """One extraction task: the paper, where to read it, and the columns to fill.
-
-    Two PDF routes are offered, because the publisher one usually fails. On the first real
-    extraction run every publisher URL was unfetchable -- APS returned 403 and Nature
-    redirected into an auth flow -- while the arXiv preprint of the same paper was open.
-    ``has_open_access_pdf`` is true in the OA-status sense and still useless operationally,
-    so it is no longer the only thing an extractor is given.
+    The task carries a path to text the pipeline already fetched and converted, not a URL:
+    the extractor reads, it does not fetch. No text -- no preprint, no open PDF -- means an
+    empty ``text_path`` and a ``text_note`` saying why, and the extractor works from the
+    abstract.
     """
+    fulltext = fulltext or FullText(cite_key, note="full text was not fetched")
+    columns = as_columns(schema)
     return {
         "instructions": INSTRUCTIONS,
         "cite_key": cite_key,
         "title": work.title,
         "doi": work.doi,
         "arxiv_id": work.arxiv_id,
-        "pdf_url": work.oa_pdf_url or "",
-        "arxiv_pdf_url": arxiv_pdf_url(work.arxiv_id),
-        "has_open_access_pdf": bool(work.oa_pdf_url or work.arxiv_id),
+        "text_path": fulltext.text_path,
+        "text_source": fulltext.source,
+        "text_note": fulltext.note,
         "abstract": work.abstract or "",
-        "schema": list(schema),
+        "columns": [column.as_dict() for column in columns],
+        "schema": [column.name for column in columns],
         "rows_file": rows_file(cite_key),
     }
 
@@ -134,8 +169,9 @@ def task_for(work: Work, cite_key: str, schema: tuple[str, ...]) -> dict:
 def prepare_tasks(
     works: list[Work],
     out_dir: Path,
-    schema: tuple[str, ...] = DEFAULT_SCHEMA,
+    schema=DEFAULT_SCHEMA,
     cite_keys: dict[int, str] | None = None,
+    texts: dict[str, FullText] | None = None,
 ) -> list[Path]:
     """Write one task file per work. Returns the paths written.
 
@@ -154,7 +190,8 @@ def prepare_tasks(
         cite_key = (cite_keys or {}).get(index) or f"work{index:03d}"
         path = out_dir / f"task_{index:03d}.json"
         path.write_text(
-            json.dumps(task_for(work, cite_key, schema), indent=2, ensure_ascii=False) + "\n",
+            json.dumps(task_for(work, cite_key, schema, (texts or {}).get(cite_key)), indent=2, ensure_ascii=False)
+            + "\n",
             encoding="utf-8",
         )
         paths.append(path)
@@ -202,32 +239,69 @@ def quote_supports(value, quote: str) -> bool:
     return False
 
 
-def validate_rows(rows: list[dict], schema: tuple[str, ...] = DEFAULT_SCHEMA) -> tuple[list[dict], list[str]]:
-    """Check quote presence and numeric consistency. Returns (accepted rows, complaints).
+def _check_type(column: Column, value) -> str:
+    """'' when the value fits the column's type, else what is wrong with it."""
+    if value in (None, "", []) or column.kind == "text":
+        return ""
+    if column.kind == "number" and not is_numeric(value):
+        return f"{column.name}={value!r} is not a number"
+    if column.kind == "choice" and str(value).strip().lower() not in {c.lower() for c in column.choices}:
+        return f"{column.name}={value!r} is not one of {', '.join(column.choices)}"
+    return ""
 
-    Two different outcomes, deliberately: a row with NO quote is dropped, because a value
-    nobody can quote is not evidence. A row whose quote does not obviously contain the
-    number it claims is *flagged and kept* -- the check is a heuristic over units and
-    formatting, and silently discarding real measurements over it would be worse than
-    surfacing them for a human to glance at.
 
-    A row with no quote AND no value is neither: it is the extractor saying it read the
-    paper and found nothing to report. It is not evidence and not a complaint.
+def validate_rows(
+    rows: list[dict],
+    schema=DEFAULT_SCHEMA,
+    texts: dict[str, str] | None = None,
+    abstracts: dict[str, str] | None = None,
+) -> tuple[list[dict], list[str]]:
+    """Check each row against its quote, its paper and its column types.
+
+    Returns (accepted rows, complaints). Outcomes, strictest first:
+
+    - no quote and no value: the extractor saying it read the paper and found nothing.
+      Neither evidence nor a complaint.
+    - no quote but a value: dropped. A value nobody can quote is not evidence.
+    - a quote that does not occur in the paper's text: dropped. The text is the file the
+      extractor was given (``texts``), or the abstract for an abstract-only row, and the
+      comparison ignores only case, whitespace and hyphenation -- so a quote that fails
+      was edited, stitched together or invented. With neither on disk -- rows from a run
+      that predates Python-side fetching -- the quote cannot be checked, and says so.
+    - a value of the wrong type (a word in a number column, an unlisted choice): that
+      value is set to null and the row kept, since its other values may stand.
+    - a quote without the value's digits: flagged and kept. That check is a heuristic over
+      units and formatting, and would silently discard real measurements if it dropped.
     """
+    columns = as_columns(schema)
+    names = tuple(column.name for column in columns)
+    texts = texts or {}
+    abstracts = abstracts or {}
     accepted = []
     complaints = []
-    for position, row in enumerate(rows):
+    for position, original in enumerate(rows):
+        row = dict(original)
         quote = str(row.get("source_quote", "")).strip()
-        key = row.get("cite_key", f"row{position}")
-        if not quote and not any(row.get(field) not in (None, "", []) for field in schema):
+        key = str(row.get("cite_key", f"row{position}"))
+        if not quote and not any(row.get(name) not in (None, "", []) for name in names):
             continue
         if not quote:
             complaints.append(f"{key}: dropped, no source_quote")
             continue
+        source = abstracts.get(key, "") if row.get("confidence") == "abstract_only" else texts.get(key, "")
+        if source:
+            if not quote_found(quote, source):
+                complaints.append(f"{key}: dropped, quote not found in the paper's text")
+                continue
+        elif texts or abstracts:
+            complaints.append(f"{key}: quote unverifiable, no text on disk for this paper")
+        for column in columns:
+            problem = _check_type(column, row.get(column.name))
+            if problem:
+                complaints.append(f"{key}: {problem}; set to null")
+                row[column.name] = None
         unsupported = [
-            field
-            for field in schema
-            if row.get(field) not in (None, "", []) and not quote_supports(row.get(field), quote)
+            name for name in names if row.get(name) not in (None, "", []) and not quote_supports(row.get(name), quote)
         ]
         if unsupported:
             complaints.append(f"{key}: quote does not contain {', '.join(unsupported)}")

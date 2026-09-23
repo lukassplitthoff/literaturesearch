@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pathlib
 
+from litsearch.extract import Column
 from litsearch.pipeline import SearchSpec, run
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -107,14 +108,38 @@ SPEC = SearchSpec(
         "cqed",
         "circuit quantum electrodynamics",
     ),
+    # Typed and defined after wave 1: "compared_to_experiment" came back as free text
+    # ("True", "yes -- predicted...", "partly: ..."), and one "critical_photon_number" column
+    # held avoided-crossing positions, ionization onsets and the dispersive n_crit.
     extraction_schema=(
-        "device",
-        "drive",
-        "method",
-        "phenomenon",
-        "critical_photon_number",
-        "drive_frequency_GHz",
-        "compared_to_experiment",
+        Column("device", "text", "the driven circuit, e.g. transmon, fluxonium, SNAIL coupler, SQUID"),
+        Column("drive", "text", "what drives it -- readout tone, parametric pump, flux modulation -- and its role"),
+        Column(
+            "method",
+            "text",
+            "the simulation or analysis method as the paper names it, e.g. Floquet-Markov master "
+            "equation, Floquet branch analysis, quasienergy spectrum, semiclassical, Lindblad",
+        ),
+        Column("phenomenon", "text", "the drive-induced effect studied: ionization, MIST, chaos, collisions..."),
+        Column(
+            "onset_photon_number",
+            "number",
+            "resonator photon number at which the paper states the drive-induced effect sets in "
+            "(e.g. ionization onset); not an avoided-crossing position, not the dispersive n_crit",
+        ),
+        Column(
+            "dispersive_ncrit",
+            "number",
+            "the dispersive critical photon number n_crit = (Delta/2g)^2, only if the paper states it",
+        ),
+        Column("drive_frequency_GHz", "number", "the drive frequency in GHz, only where stated as a number"),
+        Column(
+            "compared_to_experiment",
+            "choice",
+            "yes: this result is checked against measured data shown in the paper; qualitative: "
+            "compared in words or with another group's data; no: simulation or theory only",
+            ("yes", "qualitative", "no"),
+        ),
     ),
     # A methods question: the papers worth reading in full first are the ones that build or
     # apply the simulation, not the ones that only measure. The default ranking (experiments

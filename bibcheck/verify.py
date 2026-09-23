@@ -70,6 +70,9 @@ REPOSITORY_DOI_PREFIXES = frozenset({"10.5281", "10.48550", "10.3929", "10.5061"
 _COLLABORATION = re.compile(r"collaborat|consortium|\bteam\b|\bgroup\b|quantum ai", re.IGNORECASE)
 
 
+_ARXIV_STOPWORDS = frozenset("a an and as at by for from in into of on or the to via with".split())
+
+
 def is_arxiv_doi(doi: str | None) -> bool:
     """True for arXiv's own preprint DOI (10.48550/arXiv.NNNN), which is not a journal DOI."""
     return bool(doi and ARXIV_DOI.match(doi.strip()))
@@ -203,15 +206,8 @@ class IndexClient:
         except OSError:
             pass
 
-    def _get(self, cache_key: str, url: str, params: dict | None = None, as_text: bool = False):
-        """Fetch a URL with throttling, retries and caching. Returns None on failure."""
-        if cache_key in self.cache:
-            cached = self.cache[cache_key]
-            return None if cached is None else cached.get("payload")
-        if self.offline:
-            return None
-
-        payload = None
+    def _request(self, url: str, params: dict | None = None):
+        """One throttled GET with retries. Returns the response, or None on failure."""
         for attempt in range(MAX_RETRIES):
             delay = MIN_INTERVAL_S - (time.monotonic() - self._last_request)
             if delay > 0:
@@ -225,18 +221,53 @@ class IndexClient:
                 continue
             self._last_request = time.monotonic()
             if response.status_code == 404:
-                break
+                return None
             if response.status_code in (429, 500, 502, 503, 504):
                 time.sleep(2 ** (attempt + 1))
                 continue
             if not response.ok:
                 self.network_errors.append(f"{url}: HTTP {response.status_code}")
-                break
-            payload = response.text if as_text else response.json()
-            break
+                return None
+            return response
+        return None
 
+    def _get(self, cache_key: str, url: str, params: dict | None = None, as_text: bool = False):
+        """Fetch a URL with throttling, retries and caching. Returns None on failure."""
+        if cache_key in self.cache:
+            cached = self.cache[cache_key]
+            return None if cached is None else cached.get("payload")
+        if self.offline:
+            return None
+
+        response = self._request(url, params)
+        payload = None
+        if response is not None:
+            payload = response.text if as_text else response.json()
         self.cache[cache_key] = None if payload is None else {"payload": payload}
         return payload
+
+    def download(self, url: str, path: Path, magic: bytes = b"%PDF") -> str:
+        """Save a binary file, e.g. a paper's PDF. Returns '' on success, else the reason.
+
+        The file on disk is the cache: an existing file with the right leading bytes is not
+        fetched again. The leading bytes are checked because a publisher "PDF" link often
+        answers with an HTML login or landing page and status 200 -- on a real run two of
+        twenty did -- and converting that page would hand the extractor the wrong text.
+        """
+        path = Path(path)
+        if path.exists() and path.read_bytes()[: len(magic)] == magic:
+            return ""
+        if self.offline:
+            return "offline"
+        response = self._request(url)
+        if response is None:
+            return "request failed"
+        if not response.content.startswith(magic):
+            kind = response.headers.get("Content-Type", "unknown type") if response.headers else "unknown type"
+            return f"not a PDF ({kind.split(';')[0]})"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(response.content)
+        return ""
 
     # ------------------------------------------------------------- per index
 
@@ -274,6 +305,31 @@ class IndexClient:
         if node is None:
             return None
         return _record_from_arxiv(node)
+
+    def arxiv_search_title(self, title: str) -> Record | None:
+        """Find a paper's arXiv preprint by title. Returns the best match, or None.
+
+        Journal records often carry no arXiv id although a preprint exists, and the
+        preprint is usually the only full text that can be fetched without a subscription.
+        """
+        # Stop words are left out: arXiv's search ANDs every term, and a query containing
+        # "of" or "the" returned nothing for a paper whose title matched word for word.
+        words = [word for word in re.findall(r"[A-Za-z0-9]+", title or "") if word.lower() not in _ARXIV_STOPWORDS]
+        if not words:
+            return None
+        query = "ti:" + " AND ti:".join(words[:12])
+        params = {"search_query": query, "max_results": 5}
+        # Keyed on the query sent, not the title: when the query logic changes, results
+        # cached under the old logic -- empty ones included -- must not be served.
+        text = self._get(f"arxiv:query:{query.lower()}", ARXIV_QUERY, params=params, as_text=True)
+        if not text:
+            return None
+        try:
+            root = ET.fromstring(text)
+        except ET.ParseError:
+            return None
+        records = [_record_from_arxiv(node) for node in root.findall("atom:entry", ATOM_NS)]
+        return _best_title_match(records, title)
 
     def openalex_search(self, title: str) -> Record | None:
         """Search OpenAlex by title and return the best match."""

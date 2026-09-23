@@ -30,6 +30,7 @@ from litsearch import (
     conflict,
     export,
     extract,
+    fulltext,
     overview,
     plan,
     prioritize,
@@ -95,8 +96,10 @@ class SearchSpec:
     roles: tuple[str, ...] = screen.ROLES
 
     # Stage 6 columns. Each must be quotable from the paper or it is recorded null. Required:
-    # with none, stage 6 writes no tasks.
-    extraction_schema: tuple[str, ...] = ()
+    # with none, stage 6 writes no tasks. A bare name is a free-text column; an
+    # extract.Column adds a type ("number", or "choice" with its allowed values) and a
+    # definition, both handed to the extractor and the type checked on the way back.
+    extraction_schema: tuple = ()
     # Stage 6 reads papers in full in waves, most promising first (see priority.md). Only
     # `extraction_waves` waves are issued; raise it by one to read the next wave.
     extraction_wave_size: int = prioritize.DEFAULT_WAVE_SIZE
@@ -253,7 +256,7 @@ def plan_extraction(
     ranked = prioritize.score_works(
         included,
         cite_keys,
-        spec.extraction_schema,
+        extract.column_names(spec.extraction_schema),
         pinned,
         role_points=spec.priority_role_points,
         terms=set(spec.priority_terms) if spec.priority_terms is not None else None,
@@ -437,7 +440,7 @@ def run(spec: SearchSpec) -> int:
         extraction.waves,
         extraction.answered,
         extraction.skipped,
-        spec.extraction_schema,
+        extract.column_names(spec.extraction_schema),
         extraction.blockers,
         role_points=spec.priority_role_points,
         terms=set(spec.priority_terms) if spec.priority_terms is not None else None,
@@ -457,11 +460,24 @@ def run(spec: SearchSpec) -> int:
     else:
         prioritize.save_waves(extract_dir / "waves.json", extraction.waves)
         position_of = {key: position for position, key in included_keys.items()}
+        pending_works = [included[position_of[key]] for key in extraction.pending]
+        # Fetch and convert every pending paper here, in Python, before any extractor runs.
+        texts = {}
+        for number, (key, work) in enumerate(zip(extraction.pending, pending_works), start=1):
+            got = fulltext.fetch_text(client, work, key, extract_dir)
+            texts[key] = got
+            outcome = f"text from {got.source}" if got.text_path else f"no full text ({got.note})"
+            print(f"    text {number}/{len(pending_works)}: {key} -> {outcome}")
+        client.save_cache()
+        missing = [key for key, got in texts.items() if not got.text_path]
+        if missing:
+            print(f"  [WARN] {len(missing)} paper(s) have no full text and will be read from the abstract only")
         tasks = extract.prepare_tasks(
-            [included[position_of[key]] for key in extraction.pending],
+            pending_works,
             extract_dir,
             schema=spec.extraction_schema,
             cite_keys=dict(enumerate(extraction.pending)),
+            texts=texts,
         )
         for number, wave in enumerate(extraction.waves, start=1):
             read = sum(key in extraction.answered for key in wave)
@@ -476,10 +492,15 @@ def run(spec: SearchSpec) -> int:
                 f"extraction_waves={len(extraction.waves) + 1} to issue the next wave"
             )
     print(f"  read in full: {coverage['answered']} of {coverage['included']} screened-in paper(s), see priority.md")
-    accepted, complaints = extract.validate_rows(rows, schema=spec.extraction_schema)
+    accepted, complaints = extract.validate_rows(
+        rows,
+        schema=spec.extraction_schema,
+        texts=fulltext.load_texts(extract_dir),
+        abstracts={key: included[position].abstract for position, key in included_keys.items()},
+    )
     print(f"  {len(accepted)}/{len(rows)} rows accepted")
     if complaints:
-        print(f"  {len(complaints)} row(s) flagged for review (kept, but the quote is weak):")
+        print(f"  {len(complaints)} complaint(s) -- dropped rows, nulled values or weak quotes:")
     for complaint in complaints[:5]:
         print(f"    [flag] {complaint}")
     if tasks and not rows:
@@ -498,14 +519,16 @@ def run(spec: SearchSpec) -> int:
         review_queue=review_queue,
         quarantined=held,
     )
-    conflicts = conflict.find_conflicts(accepted, spec.extraction_schema)
+    conflicts = conflict.find_conflicts(accepted, extract.column_names(spec.extraction_schema))
     conflict.write_conflicts(cfg.out_dir / "conflicts.md", conflicts, len(accepted))
 
     # Only validated works reach the bibliography. Quarantined ones never appear.
     entry_count, findings, uncitable = export.write_bibtex(cfg.out_dir / "refs.bib", bib_works)
     errors = [finding for finding in findings if finding.level == "error"]
     kept = export.write_evidence_csv(
-        cfg.out_dir / "evidence.csv", accepted, columns=export.columns_for(spec.extraction_schema)
+        cfg.out_dir / "evidence.csv",
+        accepted,
+        columns=export.columns_for(extract.column_names(spec.extraction_schema)),
     )
 
     print(f"  corpus {len(corpus)} | validated {len(passed)} | quarantined {held}")

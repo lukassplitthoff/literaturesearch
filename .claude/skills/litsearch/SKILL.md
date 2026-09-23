@@ -158,8 +158,10 @@ next wave is worth it. If yes, the user -- not you -- raises `extraction_waves` 
 
 Delegate to the **lit-extractor** subagent, one task file per agent, with the agreed
 columns. Each writes its rows to the `rows_file` its task names
-(`extract/rows/<key>.jsonl`), so the agents of a wave can run in parallel. It reads the
-arXiv or open-access PDF where one exists and the abstract otherwise, and returns one row
+(`extract/rows/<key>.jsonl`), so the agents of a wave can run in parallel. Its prompt is
+just the task file: the pipeline has already fetched each paper (arXiv first) and converted
+it to `extract/text/<key>.txt`, and the task carries that path and every column's type and
+definition. The extractor reads the text, never fetches, and returns one row
 per measurement with a mandatory `source_quote`. Record the token count each agent
 reports: per-paper cost is the number that decides whether the next wave is worth it.
 

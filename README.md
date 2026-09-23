@@ -9,7 +9,7 @@ number carries the sentence it came from.
 ```bash
 git clone https://github.com/lukassplitthoff/literaturesearch.git
 cd literaturesearch
-pip install -e .            # runtime dependency: requests, and nothing else
+pip install -e .            # runtime dependencies: requests and pypdf
 python -m pytest            # 288 tests, no sockets opened
 ```
 
