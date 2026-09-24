@@ -155,6 +155,14 @@ def test_a_failed_arxiv_download_falls_back_to_the_title_search(tmp_path, plain_
     assert got.source == "arxiv-by-title"
 
 
+def test_reused_text_keeps_where_it_came_from(tmp_path, plain_text):
+    client = FakeClient(pdfs={"https://oa.example/p.pdf": b"%PDF"})
+    work = Work(title="T", oa_pdf_url="https://oa.example/p.pdf")
+    assert fulltext.fetch_text(client, work, "K", tmp_path).source == "open-access"
+    again = fulltext.fetch_text(FakeClient(), work, "K", tmp_path)
+    assert again.source == "open-access" and again.text_path == "text/K.txt"
+
+
 def test_valid_arxiv_ids():
     assert fulltext.valid_arxiv_id("2402.06615") == "2402.06615"
     assert fulltext.valid_arxiv_id("http://arxiv.org/abs/1511.09400v2") == "1511.09400"

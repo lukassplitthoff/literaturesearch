@@ -121,8 +121,12 @@ def fetch_text(client, work: Work, key: str, extract_dir: Path) -> FullText:
     extract_dir = Path(extract_dir)
     text_rel = f"{TEXT_DIR}/{key}.txt"
     text_path = extract_dir / text_rel
+    source_path = text_path.with_suffix(".source")
     if text_path.exists() and text_path.stat().st_size > 0:
-        return FullText(key, text_rel, "cached")
+        # A re-run reuses the text; the sidecar keeps where it came from, which a second
+        # run otherwise reported as merely "cached".
+        cached_source = source_path.read_text(encoding="utf-8").strip() if source_path.exists() else ""
+        return FullText(key, text_rel, cached_source or "cached")
 
     reasons = []
     for source, url in _candidates(client, work):
@@ -143,6 +147,7 @@ def fetch_text(client, work: Work, key: str, extract_dir: Path) -> FullText:
             continue
         text_path.parent.mkdir(parents=True, exist_ok=True)
         text_path.write_text(text, encoding="utf-8")
+        source_path.write_text(source + "\n", encoding="utf-8")
         return FullText(key, text_rel, source)
     return FullText(key, "", "", "; ".join(reasons) or "no arXiv id, no arXiv match and no open-access link")
 
